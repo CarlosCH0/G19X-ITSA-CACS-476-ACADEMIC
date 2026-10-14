@@ -1,4 +1,8 @@
-# MVP — Sistema de Identificación de Talento de Alto Potencial
+# G19X-ITSA-CACS-476-ACADEMIC
+
+Desarrollo de Sistema de Identificación de Alto Potencial
+
+## MVP — Sistema de Identificación de Talento de Alto Potencial
 
 **Producto Mínimo Viable** del proyecto de desarrollo para **PluriOne S.A. de C.V. —
 Develop Talent & Technology**. Es una versión independiente y autónoma: la carpeta
