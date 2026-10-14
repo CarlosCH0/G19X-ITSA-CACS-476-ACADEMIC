@@ -1,0 +1,47 @@
+# MVP — Sistema de Identificación de Talento de Alto Potencial
+# PluriOne S.A. de C.V. — Develop Talent & Technology
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: hipo_mvp_db
+    environment:
+      POSTGRES_DB: talento
+      POSTGRES_USER: talento
+      POSTGRES_PASSWORD: talento
+    volumes:
+      - mvp_datos_postgres:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talento -d talento"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: hipo_mvp_backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://talento:talento@db:5432/talento
+      SECRET_KEY: ${SECRET_KEY:-cambiar-en-produccion}
+      ENTORNO: produccion
+      SEED_DEMO_DATA: "true"
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@develop.com.mx}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123!}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    container_name: hipo_mvp_frontend
+    depends_on:
+      - backend
+    ports:
+      - "8082:80"
+
+volumes:
+  mvp_datos_postgres:
