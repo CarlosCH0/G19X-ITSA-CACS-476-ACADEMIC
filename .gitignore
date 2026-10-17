@@ -1,24 +1,36 @@
-.env
-.venv/
-venv/
-env/
+# Secretos locales (mantener solo la plantilla pública).
+.env*
+!.env.example
 
 # Python
+.venv/
+venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Bases de datos y logs locales
+# Datos y respaldos locales
 *.db
-*.sqlite
+*.sqlite*
 *.sqlite3
-*.log
+*.dump
+*.backup
+backups/
 
 # Frontend
-frontend/node_modules/
-frontend/dist/
+node_modules/
+dist/
 npm-debug.log*
+
+# Compilación y herramientas
+bin/
+obj/
+coverage/
+.cache/
 
 # IDE y sistema operativo
 .vscode/

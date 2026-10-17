@@ -32,6 +32,7 @@ def ejecutar(
             periodo=peticion.periodo,
             colaborador_id=peticion.colaborador_id,
             configuracion_id=peticion.configuracion_id,
+            generar_ia=peticion.generar_explicacion_ia,
         )
     except evaluacion_service.ErrorEvaluacion as e:
         raise HTTPException(422, str(e)) from e
@@ -111,6 +112,23 @@ def detalle(
         estado_revision=evaluacion_service._estado_revision_de(res),
         resultado=resultado,
         observaciones=observaciones,
+    )
+
+
+@router.post("/{evaluacion_id}/explicacion", response_model=ResultadoOut, summary="Explicación IA (RF-08)")
+def regenerar_explicacion(
+    evaluacion_id: int,
+    db: Session = Depends(get_db),
+    user: UserContext = Depends(require_permission("ia.usar")),
+):
+    res = evaluacion_service.generar_explicacion(db, user, evaluacion_id)
+    if res is None:
+        raise HTTPException(404, "Evaluación o resultado no encontrado")
+    return ResultadoOut(
+        id=res.id, evaluacion_id=res.evaluacion_id, puntuacion=res.puntuacion,
+        clasificacion=res.clasificacion, cobertura=res.cobertura, factores=res.factores,
+        explicacion=res.explicacion, explicacion_origen=res.explicacion_origen,
+        fecha_explicacion=res.fecha_explicacion, revisiones=[],
     )
 
 

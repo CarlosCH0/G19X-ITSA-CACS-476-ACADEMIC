@@ -1,10 +1,10 @@
 /**
- * Logo HiPo — icono vectorial oficial del sistema (MVP).
+ * Logo HiPo — icono vectorial oficial del sistema.
  *
- * Matriz 9-box minimalista: solo el cuadrante superior derecho
- * (alto desempeño × alto potencial) se destaca en ámbar, con un destello
- * que representa al colaborador identificado.
- * Réplica exacta de `logo/logo-icono.svg`.
+ * Icono sencillo de la matriz 9-box. El cuadro superior derecho,
+ * que representa alto desempeno y alto potencial, se resalta en ambar.
+ * El destello representa a la persona identificada.
+ * Usa los mismos colores que `logo/logo-icono.svg` y `styles.css`.
  */
 export default function Logo({ tamano = 28, conFondo = true, className = '' }) {
   const celdas = [

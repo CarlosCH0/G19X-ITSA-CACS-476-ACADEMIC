@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Indicadores y mediciones (RF-04, RN-01, RN-02). — MVP"""
-from fastapi import APIRouter, Depends, HTTPException
+"""Indicadores y mediciones (RF-04, RN-01, RN-02)."""
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import PlainTextResponse, Response
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.deps import UserContext, require_permission
 from app.db.base import get_db
+from app.models import Validez
 from app.schemas import (
     IndicadorCreate,
     IndicadorOut,
@@ -97,6 +100,75 @@ def cargar_mediciones(
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
     return {"detalle": "Mediciones registradas", "cantidad": len(peticion.mediciones)}
+
+
+@router.get("/plantilla-csv", response_class=PlainTextResponse, summary="Plantilla CSV")
+def plantilla_csv(
+    db: Session = Depends(get_db),
+    _: UserContext = Depends(require_permission("indicadores.gestionar")),
+):
+    contenido = indicador_service.plantilla_csv(db)
+    return PlainTextResponse(
+        content=contenido,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="plantilla_mediciones.csv"'},
+    )
+
+
+@router.get("/plantilla-xlsx", summary="Plantilla Excel con formato profesional")
+def plantilla_xlsx(
+    _: UserContext = Depends(require_permission("indicadores.gestionar")),
+):
+    contenido = indicador_service.plantilla_xlsx()
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="plantilla_mediciones.xlsx"'},
+    )
+
+
+class CargaCsvRequest(BaseModel):
+    contenido: str = Field(min_length=10, max_length=2_000_000)
+    validar_solo: bool = False
+
+
+@router.post("/carga-csv", summary="Carga masiva de mediciones (validación RN-01)")
+def carga_csv(
+    peticion: CargaCsvRequest,
+    db: Session = Depends(get_db),
+    user: UserContext = Depends(require_permission("indicadores.gestionar")),
+):
+    try:
+        return indicador_service.cargar_mediciones_csv(
+            db, user, peticion.contenido, peticion.validar_solo
+        )
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+
+
+@router.post("/carga-xlsx", summary="Carga masiva desde Excel")
+def carga_xlsx(
+    archivo: UploadFile = File(...),
+    validar_solo: bool = Form(False),
+    db: Session = Depends(get_db),
+    user: UserContext = Depends(require_permission("indicadores.gestionar")),
+):
+    if not archivo.filename or not archivo.filename.lower().endswith(".xlsx"):
+        raise HTTPException(422, "Selecciona un archivo Excel con extensión .xlsx.")
+    contenido = archivo.file.read(10_000_001)
+    if len(contenido) > 10_000_000:
+        raise HTTPException(413, "El archivo Excel supera el límite de 10 MB.")
+    try:
+        contenido_csv = indicador_service.xlsx_a_csv(contenido)
+        if len(contenido_csv.encode("utf-8")) > 2_000_000:
+            raise HTTPException(413, "El contenido de la hoja supera el límite de 2 MB.")
+        return indicador_service.cargar_mediciones_csv(
+            db, user, contenido_csv, validar_solo
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
 
 
 @router.patch("/mediciones/{medicion_id}/validez", summary="Validar medición (RN-01)")

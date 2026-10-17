@@ -16,19 +16,24 @@ import jwt
 from app.core.config import settings
 
 ALGORITMO_HASH = "pbkdf2_sha256"
-ITERACIONES = 390_000  # OWASP 2023 recomienda >= 600k para PBKDF2-SHA256 en FIPS; ajustable
-# Se usa un valor alto y configurable por entorno sin dependencias nativas.
+# Se usan 390 mil iteraciones para equilibrar seguridad y velocidad al iniciar sesion.
+# Se puede ajustar segun el hardware; cada hash guarda su cantidad de iteraciones.
+ITERACIONES = 390_000
 
 
 def hash_password(texto_plano: str) -> str:
-    """Genera el hash de una contraseña con sal aleatoria."""
+    """Devuelve el hash PBKDF2-SHA256 de la contraseña, con sal aleatoria.
+
+    Nunca guardamos texto plano. El formato es:
+        pbkdf2_sha256$<iteraciones>$<sal>$<hash_hex>
+    """
     sal = secrets.token_hex(16)
     derivado = hashlib.pbkdf2_hmac("sha256", texto_plano.encode("utf-8"), sal.encode("utf-8"), ITERACIONES)
     return f"{ALGORITMO_HASH}${ITERACIONES}${sal}${derivado.hex()}"
 
 
 def verify_password(texto_plano: str, hash_almacenado: str) -> bool:
-    """Verifica una contraseña contra su hash almacenado (comparación constante)."""
+    """Compara la contraseña contra su hash (en tiempo constante)."""
     try:
         algoritmo, iteraciones, sal, hash_hex = hash_almacenado.split("$")
         if algoritmo != ALGORITMO_HASH:
@@ -56,5 +61,5 @@ def create_access_token(usuario_id: int, rol: str, permisos: list[str]) -> str:
 
 
 def decode_token(token: str) -> dict[str, Any]:
-    """Decodifica y valida un JWT. Lanza jwt.PyJWTError si es inválido/expirado."""
+    """Decodifica y valida el JWT. Lanza jwt.PyJWTError si es inválido o expiró."""
     return jwt.decode(token, settings.secret_key, algorithms=[settings.algoritmo_token])

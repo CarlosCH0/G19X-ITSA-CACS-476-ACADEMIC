@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
-# Asociación N:M ROL — PERMISO
+# Tabla de relacion entre roles y permisos.
 rol_permiso = Table(
     "rol_permiso",
     Base.metadata,

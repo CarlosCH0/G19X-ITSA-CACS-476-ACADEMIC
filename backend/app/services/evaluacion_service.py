@@ -1,13 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Flujo de identificación de talento de alto potencial.
+"""El flujo que identifica talento de alto potencial (el corazón del sistema).
 
-Etapas (documento de arquitectura, diagrama D4):
-1. Preparación y validación de datos (RN-01, RN-02)
-2. Cálculo de variables derivadas: normalización min-max por población (RF-05)
-3. Puntuación ponderada por criterios configurables (RF-06, RF-07)
-4. Clasificación por umbral configurable (RN-03)
-5. Factores principales + explicación IA (RF-08, RF-09)
-6-7. Persistencia por periodo sin sobrescribir (RN-04, RN-05) y auditoría.
+Siguiendo el diagrama D4 del documento de arquitectura, cada ejecución hace:
+
+1. Junta los datos del periodo y deja solo las mediciones válidas (RN-01, RN-02)
+2. Normaliza cada indicador min-max dentro del área (RF-05)
+3. Calcula la puntuación ponderada con los pesos de la configuración (RF-06, RF-07)
+4. Clasifica comparando contra el umbral (RN-03)
+5. Guarda los factores principales y genera la explicación (RF-08, RF-09)
+6. Persiste todo por periodo —sin sobrescribir históricos— y registra auditoría
+   (RN-04, RN-05)
 """
 from datetime import datetime, timezone
 
@@ -18,6 +20,7 @@ from app.core.config import settings
 from app.core.deps import UserContext
 from app.models import (
     Clasificacion,
+    AreaEvaluacion,
     Colaborador,
     ConfiguracionEvaluacion,
     Direccion,
@@ -31,7 +34,7 @@ from app.models import (
     Validez,
 )
 from app.schemas import ResumenEjecucion
-from app.services import auditoria_service
+from app.services import area_evaluacion_service, auditoria_service, ia_service
 
 
 class ErrorEvaluacion(Exception):
@@ -39,7 +42,7 @@ class ErrorEvaluacion(Exception):
 
 
 # ------------------------------------------------------------------
-# Configuración de criterios
+# Configuracion de criterios.
 # ------------------------------------------------------------------
 def obtener_configuracion(
     db: Session, configuracion_id: int | None = None
@@ -69,7 +72,7 @@ def _estado_revision_de(resultado: ResultadoEvaluacion | None) -> EstadoRevision
 
 
 # ------------------------------------------------------------------
-# Ejecución del flujo
+# Ejecucion del proceso.
 # ------------------------------------------------------------------
 def ejecutar_evaluacion(
     db: Session,
@@ -77,6 +80,7 @@ def ejecutar_evaluacion(
     periodo: str,
     colaborador_id: int | None = None,
     configuracion_id: int | None = None,
+    generar_ia: bool = True,
 ) -> ResumenEjecucion:
     cfg = obtener_configuracion(db, configuracion_id)
     pesos: dict[str, float] = dict((cfg.criterios or {}).get("pesos", {}))
@@ -87,7 +91,8 @@ def ejecutar_evaluacion(
     cobertura_min = float(reglas.get("cobertura_minima", 0.8))
     umbral_dev_rel = float(reglas.get("umbral_desarrollo_rel", 0.85))
 
-    # --- 1. Población y datos válidos del periodo (RN-01: solo VALIDA) ---
+    # 1) Se toma la poblacion activa del periodo. Solo cuentan mediciones validas
+    # (RN-01); las pendientes o invalidas no entran en el calculo.
     consulta = select(Colaborador).where(Colaborador.estado.is_(True))
     if colaborador_id:
         consulta = consulta.where(Colaborador.id == colaborador_id)
@@ -96,7 +101,30 @@ def ejecutar_evaluacion(
         raise ErrorEvaluacion("No hay colaboradores activos para evaluar.")
     ids = [c.id for c in colaboradores]
 
-    codigos_pesos = list(pesos.keys())
+    area_evaluacion_service.asegurar_areas(db)
+    configuraciones_area = db.scalars(
+        select(AreaEvaluacion).where(AreaEvaluacion.area.in_({c.area for c in colaboradores}))
+    ).all()
+    pesos_por_area = {
+        configuracion.area: {
+            indicador.codigo: pesos[indicador.codigo]
+            for indicador in configuracion.indicadores
+            if indicador.activo and indicador.codigo in pesos
+        }
+        for configuracion in configuraciones_area
+    }
+    areas_sin_pruebas = sorted(
+        {colab.area for colab in colaboradores if not pesos_por_area.get(colab.area)}
+    )
+    if areas_sin_pruebas:
+        raise ErrorEvaluacion(
+            "No hay pruebas activas con ponderación vigente para estas áreas: "
+            f"{', '.join(areas_sin_pruebas)}. Configura sus pruebas o ponderaciones antes de evaluar."
+        )
+
+    codigos_pesos = sorted(
+        {codigo for pesos_area in pesos_por_area.values() for codigo in pesos_area}
+    )
     indicadores = {
         i.codigo: i
         for i in db.scalars(
@@ -105,12 +133,6 @@ def ejecutar_evaluacion(
             )
         )
     }
-    faltantes = [c for c in codigos_pesos if c not in indicadores]
-    if faltantes:
-        raise ErrorEvaluacion(
-            f"Indicadores inactivos o inexistentes en los criterios: {', '.join(faltantes)}"
-        )
-
     mediciones = db.scalars(
         select(MedicionIndicador)
         .join(Indicador, MedicionIndicador.indicador_id == Indicador.id)
@@ -118,35 +140,39 @@ def ejecutar_evaluacion(
             MedicionIndicador.periodo == periodo,
             MedicionIndicador.colaborador_id.in_(ids),
             Indicador.activo.is_(True),
+            Indicador.codigo.in_(codigos_pesos),
             MedicionIndicador.validez == Validez.VALIDA,
         )
     ).all()
 
     valores: dict[int, dict[str, float]] = {cid: {} for cid in ids}
+    areas_por_id = {colab.id: colab.area for colab in colaboradores}
     for m in mediciones:
         codigo = m.indicador.codigo
-        if codigo in pesos:
+        if codigo in pesos_por_area[areas_por_id[m.colaborador_id]]:
             valores[m.colaborador_id][codigo] = float(m.valor)
 
-    # --- 2. Variables derivadas: normalización min-max por indicador ---
-    minimos: dict[str, float] = {}
-    maximos: dict[str, float] = {}
-    for codigo in codigos_pesos:
-        serie = [valores[cid][codigo] for cid in ids if codigo in valores[cid]]
-        if serie:
-            minimos[codigo] = min(serie)
-            maximos[codigo] = max(serie)
+    # 2. Se normaliza cada indicador dentro de su area.
+    minimos: dict[tuple[str, str], float] = {}
+    maximos: dict[tuple[str, str], float] = {}
+    for area, pesos_area in pesos_por_area.items():
+        ids_area = [colab.id for colab in colaboradores if colab.area == area]
+        for codigo in pesos_area:
+            serie = [valores[cid][codigo] for cid in ids_area if codigo in valores[cid]]
+            if serie:
+                minimos[(area, codigo)] = min(serie)
+                maximos[(area, codigo)] = max(serie)
 
-    def normalizar(codigo: str, valor: float) -> float:
-        mn, mx = minimos[codigo], maximos[codigo]
+    def normalizar(area: str, codigo: str, valor: float) -> float:
+        mn, mx = minimos[(area, codigo)], maximos[(area, codigo)]
         if mx == mn:
-            return 0.5  # población constante: contribución neutra
+            return 0.5  # Si todos tienen el mismo valor, su aporte es neutro.
         n = (valor - mn) / (mx - mn)
         if indicadores[codigo].direccion == Direccion.MENOR_MEJOR:
             n = 1.0 - n
         return n
 
-    # --- 3-5. Puntuación, clasificación, factores y explicación ---
+    # 3-5. Se calculan el puntaje, la clasificacion, los factores y la explicacion.
     ahora = datetime.now(timezone.utc)
     por_clasificacion: dict[str, int] = {}
     completos = incompletos = 0
@@ -154,16 +180,17 @@ def ejecutar_evaluacion(
 
     for colab in colaboradores:
         disponibles = valores[colab.id]
-        cobertura = len(disponibles) / len(pesos) if pesos else 0.0
+        pesos_area = pesos_por_area[colab.area]
+        cobertura = len(disponibles) / len(pesos_area) if pesos_area else 0.0
 
         factores: list[dict] = []
         suma_ponderada = 0.0
         suma_pesos = 0.0
-        for codigo, peso in pesos.items():
+        for codigo, peso in pesos_area.items():
             if codigo not in disponibles:
                 continue
             ind = indicadores[codigo]
-            norm = normalizar(codigo, disponibles[codigo])
+            norm = normalizar(colab.area, codigo, disponibles[codigo])
             contribucion = peso * norm
             suma_ponderada += contribucion
             suma_pesos += peso
@@ -180,8 +207,7 @@ def ejecutar_evaluacion(
             )
         factores.sort(key=lambda f: f["contribucion"], reverse=True)
 
-        # RN-02: los registros con información insuficiente NO se presentan
-        # como equivalentes a una evaluación completa.
+        # RN-02: si faltan datos, el resultado no se marca como evaluacion completa.
         es_completa = cobertura >= cobertura_min and suma_pesos > 0
         puntuacion = round(100.0 * suma_ponderada / suma_pesos, 2) if suma_pesos else None
 
@@ -212,6 +238,23 @@ def ejecutar_evaluacion(
             cobertura=round(cobertura, 4),
             factores=factores,
         )
+        if generar_ia and clasificacion != Clasificacion.NO_EVALUABLE:
+            contexto = {
+                "nombre": colab.nombre,
+                "area": colab.area,
+                "puesto": colab.puesto,
+                "periodo": periodo,
+                "puntuacion": puntuacion or 0,
+                "clasificacion": clasificacion.value,
+                "umbral": cfg.umbral_hipo,
+                "cobertura_pct": f"{cobertura * 100:.0f}%",
+                "factores_top": factores[:5],
+                "version_modelo": settings.modelo_version,
+            }
+            texto, origen = ia_service.explicar_evaluacion(contexto)
+            resultado.explicacion = texto
+            resultado.explicacion_origen = origen
+            resultado.fecha_explicacion = ahora
         db.add(resultado)
 
         evaluacion_ids.append(evaluacion.id)
@@ -309,15 +352,42 @@ def obtener_detalle(db: Session, evaluacion_id: int) -> Evaluacion | None:
     return db.get(Evaluacion, evaluacion_id)
 
 
-def generar_explicacion_local(res) -> str:
-    """Resumen determinista del resultado (MVP: sin dependencias de IA externa)."""
+def generar_explicacion(
+    db: Session, usuario: UserContext, evaluacion_id: int
+) -> ResultadoEvaluacion | None:
+    """(Re)genera la explicación IA de una evaluación existente (RF-08, RF-09)."""
+    ev = db.get(Evaluacion, evaluacion_id)
+    if ev is None or ev.resultado is None:
+        return None
+    res = ev.resultado
     top = (res.factores or [])[:5]
-    factores_txt = ", ".join(f"{f['nombre']} ({f['contribucion']:.1f} pts)" for f in top)
-    return (
-        f"Resultado con puntuación {res.puntuacion if res.puntuacion is not None else '—'}/100 "
-        f"y cobertura {res.cobertura * 100:.0f}%. Factores principales: {factores_txt}. "
-        "Este resultado es un insumo de apoyo y debe ser revisado por un usuario autorizado."
+    contexto = {
+        "nombre": ev.colaborador.nombre,
+        "area": ev.colaborador.area,
+        "puesto": ev.colaborador.puesto,
+        "periodo": ev.periodo,
+        "puntuacion": res.puntuacion or 0,
+        "clasificacion": res.clasificacion.value if res.clasificacion else "n/d",
+        "umbral": ev.configuracion.umbral_hipo if ev.configuracion else 0,
+        "cobertura_pct": f"{(res.cobertura or 0) * 100:.0f}%",
+        "factores_top": top,
+        "version_modelo": ev.version_modelo,
+    }
+    texto, origen = ia_service.explicar_evaluacion(contexto)
+    res.explicacion = texto
+    res.explicacion_origen = origen
+    res.fecha_explicacion = datetime.now(timezone.utc)
+    auditoria_service.registrar(
+        db,
+        accion="evaluacion.explicacion",
+        recurso=f"evaluacion:{evaluacion_id}",
+        usuario_id=usuario.id,
+        usuario_nombre=usuario.nombre,
+        detalle={"origen": origen},
     )
+    db.commit()
+    db.refresh(res)
+    return res
 
 
 def historial_colaborador(db: Session, colaborador_id: int) -> list[dict]:

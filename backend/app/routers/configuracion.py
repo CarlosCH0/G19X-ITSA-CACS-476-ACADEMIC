@@ -5,10 +5,43 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import UserContext, require_permission
 from app.db.base import get_db
-from app.schemas import ConfiguracionCreate, ConfiguracionOut
-from app.services import configuracion_service
+from app.schemas import (
+    AreaPruebasUpdate,
+    ConfiguracionAreasPruebasOut,
+    ConfiguracionCreate,
+    ConfiguracionOut,
+)
+from app.services import area_evaluacion_service, configuracion_service
 
 router = APIRouter(prefix="/configuracion", tags=["Configuración de criterios"])
+
+
+@router.get(
+    "/areas-pruebas",
+    response_model=ConfiguracionAreasPruebasOut,
+    summary="Pruebas asignadas por área",
+)
+def listar_pruebas_por_area(
+    db: Session = Depends(get_db),
+    _: UserContext = Depends(require_permission("configuracion.gestionar")),
+):
+    return area_evaluacion_service.listar(db)
+
+
+@router.put(
+    "/areas-pruebas",
+    response_model=ConfiguracionAreasPruebasOut,
+    summary="Actualizar pruebas de un área",
+)
+def actualizar_pruebas_por_area(
+    datos: AreaPruebasUpdate,
+    db: Session = Depends(get_db),
+    user: UserContext = Depends(require_permission("configuracion.gestionar")),
+):
+    try:
+        return area_evaluacion_service.actualizar(db, user, datos)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
 
 
 @router.get("", response_model=list[ConfiguracionOut], summary="Versiones de criterios")

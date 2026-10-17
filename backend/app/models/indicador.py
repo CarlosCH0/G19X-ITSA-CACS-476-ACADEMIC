@@ -4,17 +4,27 @@ import enum
 from datetime import datetime
 
 from sqlalchemy import (
+    Column,
     DateTime,
     Enum,
     Float,
     ForeignKey,
     String,
+    Table,
     UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+
+area_indicador = Table(
+    "area_indicador",
+    Base.metadata,
+    Column("area_evaluacion_id", ForeignKey("area_evaluacion.id", ondelete="CASCADE"), primary_key=True),
+    Column("indicador_id", ForeignKey("indicador.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class TipoIndicador(str, enum.Enum):
@@ -55,6 +65,19 @@ class Indicador(Base):
 
     mediciones: Mapped[list["MedicionIndicador"]] = relationship(
         back_populates="indicador", cascade="all, delete-orphan"
+    )
+    areas_evaluacion: Mapped[list["AreaEvaluacion"]] = relationship(
+        secondary=area_indicador, back_populates="indicadores"
+    )
+
+
+class AreaEvaluacion(Base):
+    __tablename__ = "area_evaluacion"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    area: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    indicadores: Mapped[list[Indicador]] = relationship(
+        secondary=area_indicador, back_populates="areas_evaluacion", lazy="selectin"
     )
 
 

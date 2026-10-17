@@ -52,6 +52,9 @@ export default function Indicadores() {
       {form && (
         <div className="panel">
           <h2>{form.id ? 'Editar indicador' : 'Nuevo indicador'}</h2>
+          <p className="subtitulo" style={{ margin: '-4px 0 10px' }}>
+            El código es el identificador único del indicador y también se usa en la carga masiva CSV.
+          </p>
           <div className="filtros">
             {!form.id && (
               <input placeholder="Código (ej. INNOVACION)" value={form.codigo}

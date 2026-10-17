@@ -13,7 +13,7 @@ from app.schemas import (
     ObservacionOut,
     PaginaColaboradores,
 )
-from app.services import colaborador_service, revision_service
+from app.services import colaborador_service, plan_service, revision_service
 
 router = APIRouter(prefix="/colaboradores", tags=["Colaboradores"])
 
@@ -134,6 +134,17 @@ def historial(
     if colaborador_service.obtener(db, colaborador_id) is None:
         raise HTTPException(404, "Colaborador no encontrado")
     return colaborador_service.perfil_consolidado(db, colaborador_id)["historial"]
+
+
+@router.get("/{colaborador_id}/planes", summary="Planes de desarrollo del colaborador")
+def planes_colaborador(
+    colaborador_id: int,
+    db: Session = Depends(get_db),
+    _: UserContext = Depends(require_permission("planes.consultar")),
+):
+    if colaborador_service.obtener(db, colaborador_id) is None:
+        raise HTTPException(404, "Colaborador no encontrado")
+    return plan_service.planes_de_colaborador(db, colaborador_id)
 
 
 @router.post(

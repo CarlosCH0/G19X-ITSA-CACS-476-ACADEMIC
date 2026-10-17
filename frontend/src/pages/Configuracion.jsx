@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client.js'
+import { formatearFecha } from '../utils/fecha.js'
 
 export default function Configuracion() {
   const [lista, setLista] = useState([])
   const [indicadores, setIndicadores] = useState([])
+  const [configuracionAreas, setConfiguracionAreas] = useState(null)
+  const [areaSeleccionada, setAreaSeleccionada] = useState('')
+  const [indicadoresArea, setIndicadoresArea] = useState([])
+  const [guardandoArea, setGuardandoArea] = useState(false)
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [form, setForm] = useState(null) // {nombre, umbral, cobertura, pesos:{}}
@@ -13,8 +18,22 @@ export default function Configuracion() {
   }
   useEffect(() => {
     cargar()
-    api.get('/api/indicadores', { solo_activos: true }).then(setIndicadores)
+    api.get('/api/indicadores', { solo_activos: true })
+      .then(setIndicadores)
+      .catch((e) => setError(e.message))
+    api.get('/api/configuracion/areas-pruebas')
+      .then((datos) => {
+        setConfiguracionAreas(datos)
+        setAreaSeleccionada((actual) =>
+          datos.areas.some((item) => item.area === actual) ? actual : datos.areas[0]?.area || '')
+      })
+      .catch((e) => setError(e.message))
   }, [])
+
+  useEffect(() => {
+    const area = configuracionAreas?.areas.find((item) => item.area === areaSeleccionada)
+    setIndicadoresArea(area?.indicador_ids || [])
+  }, [configuracionAreas, areaSeleccionada])
 
   const nuevaVersion = () => {
     const activa = lista.find((c) => c.activa)
@@ -50,6 +69,30 @@ export default function Configuracion() {
     } catch (e) { setError(e.message) }
   }
 
+  const cambiarIndicadorArea = (id) => {
+    setIndicadoresArea((actuales) => (
+      actuales.includes(id)
+        ? actuales.filter((indicadorId) => indicadorId !== id)
+        : [...actuales, id]
+    ))
+  }
+
+  const guardarPruebasArea = async () => {
+    try {
+      setGuardandoArea(true)
+      const actualizado = await api.put('/api/configuracion/areas-pruebas', {
+        area: areaSeleccionada,
+        indicador_ids: indicadoresArea,
+      })
+      setConfiguracionAreas(actualizado)
+      setAviso(`Pruebas de ${areaSeleccionada} actualizadas. Los resultados históricos se conservan.`)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setGuardandoArea(false)
+    }
+  }
+
   const suma = form ? Object.values(form.pesos).reduce((a, b) => a + Number(b || 0), 0) : 0
 
   return (
@@ -63,8 +106,61 @@ export default function Configuracion() {
       {error && <div className="error">{error}</div>}
       {aviso && <div className="aviso">{aviso}</div>}
 
+      <div className="panel">
+        <h2>Pruebas por área</h2>
+        <p className="subtitulo" style={{ margin: '-4px 0 12px' }}>
+          Cada área se evalúa solo con los indicadores asignados aquí. Las áreas actuales se
+          inicializaron con todas las pruebas vigentes; agregar una prueba no elimina indicadores
+          del catálogo ni cambia evaluaciones anteriores.
+        </p>
+        {configuracionAreas?.areas.length ? (
+          <>
+            <label style={{ display: 'inline-grid', gap: 4, marginBottom: 12 }}>
+              Área
+              <select value={areaSeleccionada} onChange={(e) => setAreaSeleccionada(e.target.value)}>
+                {configuracionAreas.areas.map((area) => (
+                  <option key={area.area} value={area.area}>{area.area}</option>
+                ))}
+              </select>
+            </label>
+            <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
+              {configuracionAreas.indicadores.map((indicador) => {
+                const seleccionado = indicadoresArea.includes(indicador.id)
+                const disponible = indicador.activo && indicador.en_criterios
+                return (
+                  <label key={indicador.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={seleccionado}
+                      disabled={guardandoArea || (!seleccionado && !disponible)}
+                      onChange={() => cambiarIndicadorArea(indicador.id)}
+                    />
+                    <span>
+                      {indicador.nombre} <small>({indicador.codigo})</small>
+                      {!indicador.activo && <small> — indicador inactivo</small>}
+                      {indicador.activo && !indicador.en_criterios && <small> — sin peso en la versión activa</small>}
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+            <p className="subtitulo">
+              Seleccionadas: <b>{indicadoresArea.length}</b>. Para agregar una prueba, debe ser un
+              indicador activo con peso en la versión vigente.
+            </p>
+            <button onClick={guardarPruebasArea} disabled={guardandoArea || !areaSeleccionada}>
+              {guardandoArea ? 'Guardando…' : 'Guardar pruebas del área'}
+            </button>
+          </>
+        ) : configuracionAreas ? (
+          <p className="subtitulo">No hay áreas con colaboradores activos para configurar.</p>
+        ) : (
+          <p className="subtitulo">Cargando áreas y pruebas…</p>
+        )}
+      </div>
+
       <div className="filtros">
-        <button onClick={nuevaVersion}>+ Nueva versión (copia de la activa)</button>
+        <button onClick={nuevaVersion} title="Crea una copia de la versión activa para modificarla">+ Nueva versión (copia de la activa)</button>
       </div>
 
       {form && (
@@ -120,7 +216,7 @@ export default function Configuracion() {
                     {c.activa ? 'Activa' : 'Inactiva'}
                   </span>
                 </td>
-                <td>{new Date(c.fecha_creacion).toLocaleDateString('es-MX')}</td>
+                <td>{formatearFecha(c.fecha_creacion)}</td>
                 <td>
                   {!c.activa && (
                     <button className="secundario" onClick={() => activar(c.id)}>Activar</button>

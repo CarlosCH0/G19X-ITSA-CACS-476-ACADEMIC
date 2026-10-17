@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { formatearFechaHora } from '../utils/fecha.js'
 
 const CLAS = {
   alto_potencial: ['et-hipo', 'Alto potencial'],
@@ -18,7 +19,9 @@ export default function EvaluacionDetalle() {
   const [comentario, setComentario] = useState('')
   const [textoObs, setTextoObs] = useState('')
 
-  const cargar = () => api.get(`/api/evaluaciones/${id}`).then(setEv).catch((e) => setError(e.message))
+  const cargar = () => {
+    api.get(`/api/evaluaciones/${id}`).then(setEv).catch((e) => setError(e.message))
+  }
   useEffect(cargar, [id])
 
   const revisar = async (estado) => {
@@ -26,6 +29,13 @@ export default function EvaluacionDetalle() {
       await api.post(`/api/revisiones/resultados/${ev.resultado.id}`, { estado, comentario })
       setComentario('')
       cargar()
+    } catch (e) { setError(e.message) }
+  }
+
+  const regenerarExplicacion = async () => {
+    try {
+      const r = await api.post(`/api/evaluaciones/${id}/explicacion`)
+      setEv({ ...ev, resultado: { ...ev.resultado, explicacion: r.explicacion, explicacion_origen: r.explicacion_origen } })
     } catch (e) { setError(e.message) }
   }
 
@@ -50,7 +60,7 @@ export default function EvaluacionDetalle() {
       <h1 className="titulo">Evaluación #{ev.id}</h1>
       <p className="subtitulo">
         <Link to={`/colaboradores/${ev.colaborador_id}`}>{ev.colaborador_nombre}</Link> · {ev.area} ·
-        Periodo {ev.periodo} · Evaluado el {new Date(ev.fecha).toLocaleString('es-MX')} ·
+        Periodo {ev.periodo} · Evaluado el {formatearFechaHora(ev.fecha)} ·
         Criterios v{ev.configuracion_version} · Modelo de cálculo {ev.version_modelo}
       </p>
       {error && <div className="error">{error}</div>}
@@ -114,6 +124,26 @@ export default function EvaluacionDetalle() {
         </div>
 
         <div>
+          <div className="panel">
+            <h2>Explicación del resultado (asistida por IA)</h2>
+            {res?.explicacion ? (
+              <>
+                <p style={{ whiteSpace: 'pre-wrap' }}>{res.explicacion}</p>
+                <small style={{ color: 'var(--gris-500)' }}>
+                  Generada por: <b>{res.explicacion_origen === 'local_determinista' ? 'resumen automático local' : 'Azure OpenAI'}</b>
+                  {res.fecha_explicacion && ` · ${formatearFechaHora(res.fecha_explicacion)}`}
+                </small>
+              </>
+            ) : (
+              <p className="subtitulo">Todavía no se ha generado una explicación para este resultado.</p>
+            )}
+            {puede('ia.usar') && (
+              <button style={{ marginTop: 10 }} className="secundario" onClick={regenerarExplicacion}>
+                🔄 Regenerar explicación
+              </button>
+            )}
+          </div>
+
           {puede('evaluaciones.revisar') && res && (
             <div className="panel">
               <h2>Revisión humana obligatoria</h2>
@@ -139,7 +169,7 @@ export default function EvaluacionDetalle() {
                       <span className={`etiqueta-estado ${r.estado === 'confirmado' ? 'et-confirmado' : 'et-pendiente'}`}>
                         {r.estado === 'confirmado' ? 'Confirmado' : 'Pendiente'}
                       </span>{' '}
-                      {r.usuario_nombre} · {new Date(r.fecha).toLocaleString('es-MX')}
+                      {r.usuario_nombre} · {formatearFechaHora(r.fecha)}
                       {r.comentario && <div style={{ color: 'var(--gris-700)' }}>“{r.comentario}”</div>}
                     </div>
                   ))}
@@ -154,7 +184,7 @@ export default function EvaluacionDetalle() {
             {ev.observaciones.map((o) => (
               <div key={o.id} style={{ borderBottom: '1px solid var(--gris-100)', padding: '6px 0' }}>
                 <div style={{ fontSize: 12, color: 'var(--gris-500)' }}>
-                  {o.autor_nombre} · {new Date(o.fecha).toLocaleString('es-MX')}
+                  {o.autor_nombre} · {formatearFechaHora(o.fecha)}
                 </div>
                 <div>{o.texto}</div>
               </div>
@@ -173,4 +203,3 @@ export default function EvaluacionDetalle() {
     </div>
   )
 }
-

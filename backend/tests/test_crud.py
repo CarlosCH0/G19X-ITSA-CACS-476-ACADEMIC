@@ -1,43 +1,52 @@
 # -*- coding: utf-8 -*-
-"""Pruebas MVP de CRUD: colaboradores, usuarios, indicadores y mediciones."""
+"""Pruebas de CRUD de colaboradores e indicadores (RF-03, RF-04, RN-01)."""
 from tests.conftest import headers
 
 
 def test_crear_listar_actualizar_desactivar(client, tokens):
     auth = headers(tokens["gestor"])
 
-    r = client.post("/api/colaboradores", json={
-        "codigo": "MVP-001", "nombre": "Colaborador MVP",
-        "area": "Tecnología", "puesto": "Desarrollador",
-    }, headers=auth)
+    r = client.post(
+        "/api/colaboradores",
+        json={
+            "codigo": "COL-900",
+            "nombre": "Colaborador De Prueba",
+            "area": "Tecnología",
+            "puesto": "QA",
+        },
+        headers=auth,
+    )
     assert r.status_code == 201, r.text
     cid = r.json()["id"]
 
-    r = client.get("/api/colaboradores", params={"q": "MVP-001"}, headers=auth)
-    assert r.status_code == 200 and r.json()["total"] == 1
-
-    r = client.put(f"/api/colaboradores/{cid}", json={"puesto": "Senior"}, headers=auth)
-    assert r.status_code == 200 and r.json()["puesto"] == "Senior"
-
-    r = client.delete(f"/api/colaboradores/{cid}", headers=auth)
-    assert r.status_code == 200
-    r = client.get("/api/colaboradores", params={"incluir_inactivos": "true"}, headers=auth)
-    assert any(c["codigo"] == "MVP-001" and not c["estado"] for c in r.json()["items"])
-
-
-def test_crear_usuario_nuevo_como_admin(client, tokens):
-    r = client.post("/api/usuarios", json={
-        "nombre": "Usuario MVP", "correo": "mvp@develop.com.mx",
-        "password": "Clave12345!", "rol_id": 4,
-    }, headers=headers(tokens["admin"]))
-    assert r.status_code == 201, r.text
-
-    # Correo duplicado → 409
-    r2 = client.post("/api/usuarios", json={
-        "nombre": "Otro", "correo": "mvp@develop.com.mx",
-        "password": "Clave12345!", "rol_id": 4,
-    }, headers=headers(tokens["admin"]))
+    # Un codigo duplicado debe responder 409.
+    r2 = client.post(
+        "/api/colaboradores",
+        json={"codigo": "COL-900", "nombre": "Otro", "area": "TI"},
+        headers=auth,
+    )
     assert r2.status_code == 409
+
+    # Se prueban la busqueda y los filtros (RF-11).
+    r3 = client.get("/api/colaboradores", params={"q": "COL-900"}, headers=auth)
+    assert r3.status_code == 200
+    assert r3.json()["total"] == 1
+
+    r4 = client.put(
+        f"/api/colaboradores/{cid}",
+        json={"puesto": "QA Senior"},
+        headers=auth,
+    )
+    assert r4.status_code == 200
+    assert r4.json()["puesto"] == "QA Senior"
+
+    r5 = client.delete(f"/api/colaboradores/{cid}", headers=auth)
+    assert r5.status_code == 200
+    assert r5.json()["estado"] is False  # El registro se desactiva sin borrarlo.
+
+    # El historial y el perfil siguen disponibles.
+    r6 = client.get(f"/api/colaboradores/{cid}/perfil", headers=auth)
+    assert r6.status_code == 200
 
 
 def test_indicadores_crud_y_mediciones(client, tokens):
@@ -45,33 +54,114 @@ def test_indicadores_crud_y_mediciones(client, tokens):
 
     r = client.get("/api/indicadores", headers=headers(tokens["consulta"]))
     assert r.status_code == 200
-    indicadores = r.json()
-    assert len(indicadores) >= 10
-    por_codigo = {i["codigo"]: i["id"] for i in indicadores}
+    codigos = {i["codigo"] for i in r.json()}
+    assert "DESEMPENO_GLOBAL" in codigos
 
-    # Carga bulk de mediciones (RF-04) con upsert RN-01
-    colabs = client.get("/api/colaboradores?q=COL-002", headers=auth).json()["items"]
-    cid = colabs[0]["id"]
-    r = client.post("/api/indicadores/mediciones", json={
-        "colaborador_id": cid, "periodo": "2026-MVP",
-        "mediciones": [
-            {"indicador_id": por_codigo["LIDERAZGO"], "valor": 88.5, "validez": "valida"},
-            {"indicador_id": por_codigo["COMUNICACION"], "valor": 75.0, "validez": "pendiente"},
-        ],
-    }, headers=auth)
-    assert r.status_code == 201, r.text
+    # Cargar mediciones bulk (2 indicadores) para COL-001 en periodo de prueba
+    indicadores = {i["codigo"]: i["id"] for i in r.json()}
+    r2 = client.post(
+        "/api/indicadores/mediciones",
+        json={
+            "colaborador_id": 1,
+            "periodo": "2026-TEST",
+            "mediciones": [
+                {"indicador_id": indicadores["DESEMPENO_GLOBAL"], "valor": 88.0},
+                {"indicador_id": indicadores["LIDERAZGO"], "valor": 78.5, "validez": "valida"},
+            ],
+        },
+        headers=auth,
+    )
+    assert r2.status_code == 201, r2.text
+    assert r2.json()["cantidad"] == 2
 
-    r = client.get("/api/indicadores/mediciones",
-                   params={"colaborador_id": cid, "periodo": "2026-MVP"}, headers=auth)
-    assert r.status_code == 200 and len(r.json()) == 2
+    r3 = client.get(
+        "/api/indicadores/mediciones", params={"colaborador_id": 1, "periodo": "2026-TEST"}, headers=auth
+    )
+    assert r3.status_code == 200
+    assert len(r3.json()) == 2
 
-    # Recargar el mismo indicador hace upsert y regresa a PENDIENTE (RN-01)
-    r = client.post("/api/indicadores/mediciones", json={
-        "colaborador_id": cid, "periodo": "2026-MVP",
-        "mediciones": [{"indicador_id": por_codigo["LIDERAZGO"], "valor": 90.0, "validez": "valida"}],
-    }, headers=auth)
-    assert r.status_code == 201
-    r = client.get("/api/indicadores/mediciones",
-                   params={"colaborador_id": cid, "periodo": "2026-MVP"}, headers=auth)
-    lid = [m for m in r.json() if m["indicador_codigo"] == "LIDERAZGO"]
-    assert len(lid) == 1 and lid[0]["valor"] == 90.0
+    # La primera queda pendiente por defecto (RN-01), asi que se valida.
+    pendiente = next(m for m in r3.json() if m["validez"] == "pendiente")
+    r4 = client.patch(
+        f"/api/indicadores/mediciones/{pendiente['id']}/validez",
+        json={"validez": "valida", "comentario": "Verificado contra fuente"},
+        headers=auth,
+    )
+    assert r4.status_code == 200
+
+    # Periodos disponibles incluye el de prueba
+    r5 = client.get("/api/indicadores/periodos", headers=auth)
+    assert "2026-TEST" in r5.json()
+
+
+def test_limites_de_valor_por_tipo_de_indicador(client, tokens):
+    auth = headers(tokens["gestor"])
+    indicadores = {
+        item["codigo"]: item["id"]
+        for item in client.get("/api/indicadores", headers=auth).json()
+    }
+
+    puntuacion_fuera_de_rango = client.post(
+        "/api/indicadores/mediciones",
+        json={
+            "colaborador_id": 1,
+            "periodo": "2026-RANGO",
+            "mediciones": [
+                {"indicador_id": indicadores["LIDERAZGO"], "valor": 101},
+            ],
+        },
+        headers=auth,
+    )
+    assert puntuacion_fuera_de_rango.status_code == 422
+    assert "entre 0 y 100" in puntuacion_fuera_de_rango.json()["detail"]
+
+    cantidad_mayor_a_cien = client.post(
+        "/api/indicadores/mediciones",
+        json={
+            "colaborador_id": 1,
+            "periodo": "2026-RANGO",
+            "mediciones": [
+                {"indicador_id": indicadores["ANIOS_EXPERIENCIA"], "valor": 101},
+            ],
+        },
+        headers=auth,
+    )
+    assert cantidad_mayor_a_cien.status_code == 201
+
+    puntuacion_negativa = client.post(
+        "/api/indicadores/mediciones",
+        json={
+            "colaborador_id": 1,
+            "periodo": "2026-RANGO",
+            "mediciones": [
+                {"indicador_id": indicadores["DESEMPENO_GLOBAL"], "valor": -1},
+            ],
+        },
+        headers=auth,
+    )
+    assert puntuacion_negativa.status_code == 422
+
+
+def test_crear_usuario_nuevo_como_admin(client, tokens):
+    r = client.get("/api/usuarios/roles", headers=headers(tokens["admin"]))
+    assert r.status_code == 200
+    rol_consulta = next(rol for rol in r.json() if rol["nombre"] == "CONSULTA")
+
+    r2 = client.post(
+        "/api/usuarios",
+        json={
+            "nombre": "Nuevo Analista",
+            "correo": "analista@develop.com.mx",
+            "password": "Analista123!",
+            "rol_id": rol_consulta["id"],
+        },
+        headers=headers(tokens["admin"]),
+    )
+    assert r2.status_code == 201, r2.text
+
+    # El usuario nuevo puede iniciar sesion.
+    r3 = client.post(
+        "/api/auth/login",
+        json={"correo": "analista@develop.com.mx", "password": "Analista123!"},
+    )
+    assert r3.status_code == 200
