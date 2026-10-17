@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="titulo">
+  <title id="titulo">HiPo — Sistema de Identificación de Talento de Alto Potencial</title>
+  <!-- Fondo -->
+  <rect width="512" height="512" rx="112" fill="#1f3864"/>
+  <!-- Matriz 9-box: desempeño (eje X) x potencial (eje Y) -->
+  <rect x="78"  y="78"  width="100" height="100" rx="22" fill="#2e5395"/>
+  <rect x="206" y="78"  width="100" height="100" rx="22" fill="#2e5395"/>
+  <!-- Cuadrante HiPo: alto desempeno x alto potencial -->
+  <rect x="334" y="78"  width="100" height="100" rx="22" fill="#f9a825"/>
+  <rect x="78"  y="206" width="100" height="100" rx="22" fill="#2e5395"/>
+  <rect x="206" y="206" width="100" height="100" rx="22" fill="#2e5395"/>
+  <rect x="334" y="206" width="100" height="100" rx="22" fill="#2e5395"/>
+  <rect x="78"  y="334" width="100" height="100" rx="22" fill="#2e5395"/>
+  <rect x="206" y="334" width="100" height="100" rx="22" fill="#2e5395"/>
+  <rect x="334" y="334" width="100" height="100" rx="22" fill="#2e5395"/>
+  <!-- Destello: el talento identificado -->
+  <path d="M384 94 Q391.5 120.5 418 128 Q391.5 135.5 384 162 Q376.5 135.5 350 128 Q376.5 120.5 384 94 Z" fill="#ffffff"/>
+</svg>
