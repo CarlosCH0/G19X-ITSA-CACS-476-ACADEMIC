@@ -1,0 +1,26 @@
+.env
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Bases de datos y logs locales
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+npm-debug.log*
+
+# IDE y sistema operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
