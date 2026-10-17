@@ -11,6 +11,10 @@ import Indicadores from './pages/Indicadores.jsx'
 import Configuracion from './pages/Configuracion.jsx'
 import Auditoria from './pages/Auditoria.jsx'
 import Usuarios from './pages/Usuarios.jsx'
+import Planes from './pages/Planes.jsx'
+import MatrizSucesion from './pages/MatrizSucesion.jsx'
+import Comparador from './pages/Comparador.jsx'
+import CargaDatos from './pages/CargaDatos.jsx'
 
 function RutaProtegida({ permiso, children }) {
   const { usuario, puede } = useAuth()
@@ -38,7 +42,11 @@ export default function App() {
         <Route path="/colaboradores/:id" element={<RutaProtegida permiso="colaboradores.consultar"><ColaboradorDetalle /></RutaProtegida>} />
         <Route path="/evaluaciones" element={<RutaProtegida permiso="reportes.consultar"><Evaluaciones /></RutaProtegida>} />
         <Route path="/evaluaciones/:id" element={<RutaProtegida permiso="reportes.consultar"><EvaluacionDetalle /></RutaProtegida>} />
+        <Route path="/matriz" element={<RutaProtegida permiso="reportes.consultar"><MatrizSucesion /></RutaProtegida>} />
+        <Route path="/comparador" element={<RutaProtegida permiso="reportes.consultar"><Comparador /></RutaProtegida>} />
         <Route path="/indicadores" element={<RutaProtegida permiso="colaboradores.consultar"><Indicadores /></RutaProtegida>} />
+        <Route path="/carga-datos" element={<RutaProtegida permiso="indicadores.gestionar"><CargaDatos /></RutaProtegida>} />
+        <Route path="/planes" element={<RutaProtegida permiso="planes.consultar"><Planes /></RutaProtegida>} />
         <Route path="/configuracion" element={<RutaProtegida permiso="configuracion.gestionar"><Configuracion /></RutaProtegida>} />
         <Route path="/auditoria" element={<RutaProtegida permiso="auditoria.consultar"><Auditoria /></RutaProtegida>} />
         <Route path="/usuarios" element={<RutaProtegida permiso="usuarios.gestionar"><Usuarios /></RutaProtegida>} />

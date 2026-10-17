@@ -10,7 +10,32 @@ const CLAS = {
   no_evaluable: ['et-noevaluable', 'No evaluable'],
 }
 
-function ModalColaborador({ inicial, onGuardar, onCerrar }) {
+async function obtenerAreasDisponibles() {
+  const tamanio = 100
+  const primeraPagina = await api.get('/api/colaboradores', {
+    pagina: 1,
+    tamanio,
+  })
+  const colaboradores = [...primeraPagina.items]
+  const totalPaginas = Math.ceil(primeraPagina.total / tamanio)
+
+  for (let pagina = 2; pagina <= totalPaginas; pagina += 1) {
+    const resultado = await api.get('/api/colaboradores', {
+      pagina,
+      tamanio,
+    })
+    colaboradores.push(...resultado.items)
+  }
+
+  const areas = new Map()
+  colaboradores.forEach(({ area }) => {
+    const nombre = area.trim()
+    if (nombre) areas.set(nombre.toLocaleLowerCase('es'), nombre)
+  })
+  return [...areas.values()].sort((a, b) => a.localeCompare(b, 'es'))
+}
+
+function ModalColaborador({ inicial, areas, areasCargando, onGuardar, onCerrar }) {
   const [form, setForm] = useState(inicial || { codigo: '', nombre: '', area: '', puesto: '', fecha_ingreso: '' })
   return (
     <div className="panel">
@@ -25,13 +50,26 @@ function ModalColaborador({ inicial, onGuardar, onCerrar }) {
         )}
         <input placeholder="Nombre completo" value={form.nombre} required
                onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
-        <input placeholder="Área o departamento (ej. Tecnología)" value={form.area} required
-               onChange={(e) => setForm({ ...form, area: e.target.value })} />
+        {inicial ? (
+          <input placeholder="Área o departamento" value={form.area} required
+                 onChange={(e) => setForm({ ...form, area: e.target.value })} />
+        ) : (
+          <label style={{ fontSize: 12.5, color: 'var(--gris-700)', display: 'grid', gap: 4 }}>
+            Área
+            <select value={form.area} required disabled={areasCargando || areas.length === 0}
+                    onChange={(e) => setForm({ ...form, area: e.target.value })}>
+              <option value="" disabled>
+                {areasCargando ? 'Cargando áreas…' : areas.length ? 'Selecciona un área' : 'No hay áreas disponibles'}
+              </option>
+              {areas.map((area) => <option key={area} value={area}>{area}</option>)}
+            </select>
+          </label>
+        )}
         <input placeholder="Puesto (opcional)" value={form.puesto}
                onChange={(e) => setForm({ ...form, puesto: e.target.value })} />
         <label style={{ fontSize: 12.5, color: 'var(--gris-700)', display: 'grid', gap: 4 }}>
           Fecha de ingreso (opcional)
-          <input type="date" value={form.fecha_ingreso || ''}
+          <input type="date" lang="es-MX" value={form.fecha_ingreso || ''}
                  onChange={(e) => setForm({ ...form, fecha_ingreso: e.target.value })} />
         </label>
         <div className="botones">
@@ -51,12 +89,27 @@ export default function Colaboradores() {
   const [pagina, setPagina] = useState(1)
   const [error, setError] = useState('')
   const [editando, setEditando] = useState(null) // null | {} | colaborador
+  const [areas, setAreas] = useState([])
+  const [areasCargando, setAreasCargando] = useState(false)
 
   const cargar = () => {
     api.get('/api/colaboradores', { q, area, pagina, tamanio: 12, incluir_inactivos: true })
       .then(setDatos).catch((e) => setError(e.message))
   }
-  useEffect(cargar, [q, area, pagina])
+  useEffect(() => { cargar() }, [q, area, pagina])
+
+  const abrirNuevo = async () => {
+    setEditando({})
+    setAreasCargando(true)
+    setError('')
+    try {
+      setAreas(await obtenerAreasDisponibles())
+    } catch (e) {
+      setError(`No se pudieron cargar las áreas disponibles: ${e.message}`)
+    } finally {
+      setAreasCargando(false)
+    }
+  }
 
   const guardar = async (form) => {
     try {
@@ -82,15 +135,17 @@ export default function Colaboradores() {
 
       <div className="filtros">
         <input placeholder="Buscar por nombre o código…" value={q} onChange={(e) => { setPagina(1); setQ(e.target.value) }} />
-        <input placeholder="Área" value={area} onChange={(e) => { setPagina(1); setArea(e.target.value) }} />
+        <input placeholder="Filtrar por área" value={area} onChange={(e) => { setPagina(1); setArea(e.target.value) }} />
         {puede('colaboradores.gestionar') && !editando && (
-          <button onClick={() => setEditando({})}>+ Nuevo colaborador</button>
+          <button onClick={abrirNuevo}>+ Nuevo colaborador</button>
         )}
       </div>
 
       {editando !== null && (
         <ModalColaborador
           inicial={editando.id ? editando : null}
+          areas={areas}
+          areasCargando={areasCargando}
           onGuardar={guardar}
           onCerrar={() => setEditando(null)}
         />

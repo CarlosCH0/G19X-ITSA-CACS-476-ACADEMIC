@@ -32,7 +32,11 @@ def get_current_user(
     token: str | None = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> UserContext:
-    """Valida el JWT y carga el usuario con sus permisos vigentes desde la BD."""
+    """Resuelve el usuario del token.
+
+    Los permisos SIEMPRE se leen frescos desde la BD (no del token), así un
+    cambio de rol aplica de inmediato sin esperar a que expire la sesión.
+    """
     credenciales = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="No autenticado o token inválido/expirado",

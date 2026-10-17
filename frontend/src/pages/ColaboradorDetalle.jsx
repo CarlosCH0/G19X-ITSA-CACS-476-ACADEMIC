@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { formatearFecha, formatearFechaHora } from '../utils/fecha.js'
 
 const VALIDEZ = {
   valida: ['et-valida', 'Válida'],
@@ -14,12 +15,30 @@ const CLAS = {
   estandar: ['et-estandar', 'Estándar'],
   no_evaluable: ['et-noevaluable', 'No evaluable'],
 }
+const ESTADOS_PLAN = {
+  planificado: ['et-sin', 'Planificado'],
+  en_progreso: ['et-desarrollo', 'En progreso'],
+  completado: ['et-confirmado', 'Completado'],
+  cancelado: ['et-noevaluable', 'Cancelado'],
+}
+const INDICADORES_NO_ESCALADOS = new Set(['ANIOS_EXPERIENCIA', 'ROTACION_EQUIPO'])
+
+function errorRangoMedicion(indicador, valor) {
+  if (valor === '' || valor === undefined) return ''
+  const numero = Number(valor)
+  if (!Number.isFinite(numero)) return 'Ingresa un valor numérico.'
+  if (INDICADORES_NO_ESCALADOS.has(indicador.codigo)) {
+    return numero < 0 ? 'El valor no puede ser negativo.' : ''
+  }
+  return numero < 0 || numero > 100 ? 'Este valor debe estar entre 0 y 100.' : ''
+}
 
 export default function ColaboradorDetalle() {
   const { id } = useParams()
   const { puede } = useAuth()
   const [perfil, setPerfil] = useState(null)
   const [indicadores, setIndicadores] = useState([])
+  const [planes, setPlanes] = useState([])
   const [error, setError] = useState('')
   const [textoObs, setTextoObs] = useState('')
   const [carga, setCarga] = useState({ periodo: '', filas: {} })
@@ -30,7 +49,26 @@ export default function ColaboradorDetalle() {
       .catch((e) => setError(e.message))
   }
   useEffect(cargar, [id])
-  useEffect(() => { api.get('/api/indicadores', { solo_activos: true }).then(setIndicadores) }, [])
+  useEffect(() => {
+    const area = perfil?.colaborador.area
+    if (!area || !puede('indicadores.gestionar')) return
+
+    Promise.all([
+      api.get('/api/indicadores', { solo_activos: true }),
+      api.get('/api/configuracion/areas-pruebas'),
+    ]).then(([catalogo, configuracion]) => {
+      const pruebas = configuracion.areas.find((item) => item.area === area)?.indicador_ids || []
+      setIndicadores(catalogo.filter(
+        (indicador) => pruebas.includes(indicador.id)
+          && configuracion.indicadores.find((item) => item.id === indicador.id)?.en_criterios
+      ))
+    }).catch((e) => setError(e.message))
+  }, [perfil?.colaborador.area, puede])
+  useEffect(() => {
+    if (puede('planes.consultar')) {
+      api.get(`/api/colaboradores/${id}/planes`).then(setPlanes).catch(() => setPlanes([]))
+    }
+  }, [id])
 
   const cambiarValidez = async (medicionId, validez) => {
     try {
@@ -49,6 +87,11 @@ export default function ColaboradorDetalle() {
   }
 
   const guardarMediciones = async () => {
+    const errorRango = indicadores
+      .map((indicador) => errorRangoMedicion(indicador, carga.filas[indicador.id] ?? ''))
+      .find(Boolean)
+    if (errorRango) { setError(errorRango); return }
+
     const mediciones = Object.entries(carga.filas)
       .filter(([, v]) => v !== '' && v !== undefined)
       .map(([indicador_id, valor]) => ({ indicador_id: Number(indicador_id), valor: Number(valor), validez: 'valida' }))
@@ -70,7 +113,7 @@ export default function ColaboradorDetalle() {
     <div>
       <h1 className="titulo">{c.nombre}</h1>
       <p className="subtitulo">
-        {c.codigo} · {c.area} · {c.puesto} · Ingreso: {c.fecha_ingreso || '—'}{' '}
+        {c.codigo} · {c.area} · {c.puesto} · Ingreso: {formatearFecha(c.fecha_ingreso)}{' '}
         <span className={`etiqueta-estado ${c.estado ? 'et-valida' : 'et-noevaluable'}`}>
           {c.estado ? 'Activo' : 'Inactivo'}
         </span>
@@ -111,20 +154,40 @@ export default function ColaboradorDetalle() {
             <div style={{ borderTop: '1px solid var(--gris-100)', paddingTop: 14 }}>
               <h2>Registrar mediciones</h2>
               <p className="subtitulo" style={{ margin: '-4px 0 10px' }}>
-                Escribe el periodo y los valores; deja en blanco lo que no quieras registrar.
+                Pruebas asignadas a {c.area}. Las puntuaciones deben estar entre 0 y 100; años de
+                experiencia y rotación se registran como cantidades no negativas.
               </p>
+              {!indicadores.length && (
+                <p className="aviso">No hay pruebas con ponderación activa configuradas para esta área.</p>
+              )}
               <div className="filtros">
                 <input placeholder="Periodo (ej. 2026-S2)" value={carga.periodo}
                        onChange={(e) => setCarga({ ...carga, periodo: e.target.value })} />
               </div>
-              {indicadores.map((i) => (
-                <div key={i.id} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
-                  <span style={{ flex: 1, fontSize: 13 }}>{i.nombre}</span>
-                  <input style={{ width: 110 }} type="number" step="0.01" placeholder="Valor"
-                         value={carga.filas[i.id] ?? ''}
-                         onChange={(e) => setCarga({ ...carga, filas: { ...carga.filas, [i.id]: e.target.value } })} />
-                </div>
-              ))}
+              {indicadores.map((i) => {
+                const valor = carga.filas[i.id] ?? ''
+                const errorValor = errorRangoMedicion(i, valor)
+                return (
+                  <div key={i.id} style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <span style={{ flex: 1, fontSize: 13 }}>{i.nombre}</span>
+                      <input
+                        style={{ width: 110 }}
+                        type="number"
+                        min="0"
+                        max={INDICADORES_NO_ESCALADOS.has(i.codigo) ? undefined : '100'}
+                        step="0.01"
+                        placeholder="Valor"
+                        value={valor}
+                        aria-label={`Valor para ${i.nombre}`}
+                        aria-invalid={Boolean(errorValor)}
+                        onChange={(e) => setCarga({ ...carga, filas: { ...carga.filas, [i.id]: e.target.value } })}
+                      />
+                    </div>
+                    {errorValor && <small className="error" role="alert">{errorValor}</small>}
+                  </div>
+                )
+              })}
               <button style={{ marginTop: 8 }} onClick={guardarMediciones}>Guardar mediciones</button>
             </div>
           )}
@@ -150,11 +213,38 @@ export default function ColaboradorDetalle() {
           </div>
 
           <div className="panel">
+            <h2>Planes de desarrollo ({planes.length})</h2>
+            <p className="subtitulo" style={{ margin: '-6px 0 10px' }}>Acciones para preparar o retener a este colaborador.</p>
+            {planes.map((p) => (
+              <div key={p.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--gris-100)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                  <b>{p.titulo}</b>
+                  <span className={`etiqueta-estado ${ESTADOS_PLAN[p.estado]?.[0]}`}>{ESTADOS_PLAN[p.estado]?.[1]}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 4 }}>
+                  <div className="barra" style={{ flex: 1 }}>
+                    <div style={{ width: `${p.progreso}%` }} />
+                  </div>
+                  <span style={{ fontSize: 12.5, color: 'var(--gris-700)' }}>
+                    Acciones: {p.acciones_completadas} de {p.total_acciones} · {p.progreso}% · fecha límite {formatearFecha(p.fecha_fin)}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {!planes.length && <p className="subtitulo">Sin planes de desarrollo registrados.</p>}
+            {puede('planes.gestionar') && (
+              <div className="botones" style={{ marginTop: 12 }}>
+                <Link to="/planes"><button className="secundario">Gestionar planes</button></Link>
+              </div>
+            )}
+          </div>
+
+          <div className="panel">
             <h2>Observaciones</h2>
             {perfil.observaciones.map((o) => (
               <div key={o.id} style={{ borderBottom: '1px solid var(--gris-100)', padding: '8px 0' }}>
                 <div style={{ fontSize: 12, color: 'var(--gris-500)' }}>
-                  {o.autor_nombre} · {new Date(o.fecha).toLocaleString('es-MX')}
+                  {o.autor_nombre} · {formatearFechaHora(o.fecha)}
                 </div>
                 <div>{o.texto}</div>
               </div>
@@ -173,4 +263,3 @@ export default function ColaboradorDetalle() {
     </div>
   )
 }
-

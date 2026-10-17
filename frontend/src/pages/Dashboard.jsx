@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { formatearFechaHora } from '../utils/fecha.js'
 
 const ETIQUETAS_CLASIFICACION = {
   alto_potencial: ['et-hipo', 'Alto potencial'],
@@ -37,6 +38,7 @@ export default function Dashboard() {
   const { puede } = useAuth()
   const [datos, setDatos] = useState(null)
   const [error, setError] = useState('')
+  const [errorExportacion, setErrorExportacion] = useState('')
 
   useEffect(() => {
     api.get('/api/reportes/dashboard').then(setDatos).catch((e) => setError(e.message))
@@ -47,24 +49,39 @@ export default function Dashboard() {
 
   const { kpis, distribucion_clasificacion: dist, promedios_por_area: areas, top_alto_potencial: top, evolucion_periodos: evolucion } = datos
   const maxDist = Math.max(...Object.values(dist), 1)
+  const exportarResultados = async (formato) => {
+    setErrorExportacion('')
+    try {
+      const parametros = { periodo: datos.periodo }
+      if (formato === 'excel') {
+        await api.descargarExcel('/api/reportes/export/evaluaciones.xlsx', parametros)
+      } else {
+        await api.descargarCsv('/api/reportes/export/evaluaciones.csv', parametros)
+      }
+    } catch (err) {
+      setErrorExportacion(err.message)
+    }
+  }
 
   return (
     <div>
       <h1 className="titulo">Panel de talento</h1>
       <p className="subtitulo">
-        Periodo: <b>{datos.periodo || '—'}</b> · generado {new Date(datos.generado_en).toLocaleString('es-MX')}
+        Resumen general del periodo <b>{datos.periodo || '—'}</b> · Última actualización:{' '}
+        {formatearFechaHora(datos.generado_en)}
       </p>
 
       <div className="tarjetas">
-        <div className="tarjeta"><div className="etiqueta">Colaboradores activos</div><div className="valor">{kpis.colaboradores_activos}</div></div>
-        <div className="tarjeta"><div className="etiqueta">Evaluaciones del periodo</div><div className="valor">{kpis.evaluaciones_periodo}</div></div>
-        <div className="tarjeta"><div className="etiqueta">Alto potencial</div><div className="valor" style={{ color: 'var(--verde)' }}>{kpis.alto_potencial}</div></div>
-        <div className="tarjeta"><div className="etiqueta">Revisiones pendientes</div><div className="valor" style={{ color: 'var(--ambar)' }}>{kpis.revisiones_pendientes}</div></div>
+        <div className="tarjeta" title="Personas activas registradas en el sistema"><div className="etiqueta">Colaboradores activos</div><div className="valor">{kpis.colaboradores_activos}</div></div>
+        <div className="tarjeta" title="Evaluaciones ejecutadas en el periodo mostrado"><div className="etiqueta">Evaluaciones del periodo</div><div className="valor">{kpis.evaluaciones_periodo}</div></div>
+        <div className="tarjeta" title="Colaboradores que alcanzaron la puntuación mínima para ser alto potencial"><div className="etiqueta">Alto potencial (HiPo)</div><div className="valor" style={{ color: 'var(--verde)' }}>{kpis.alto_potencial}</div></div>
+        <div className="tarjeta" title="Resultados en espera de confirmación por un evaluador"><div className="etiqueta">Revisiones pendientes</div><div className="valor" style={{ color: 'var(--ambar)' }}>{kpis.revisiones_pendientes}</div></div>
       </div>
 
       <div className="grid-2">
         <div className="panel">
           <h2>Distribución por clasificación</h2>
+          <p className="subtitulo" style={{ margin: '-6px 0 12px' }}>Cuántos colaboradores quedaron en cada categoría tras la evaluación.</p>
           {Object.entries(dist).map(([clave, total]) => (
             <div className="factor" key={clave}>
               <div className="factor-cab">
@@ -78,6 +95,7 @@ export default function Dashboard() {
 
         <div className="panel">
           <h2>Evolución del promedio por periodo</h2>
+          <p className="subtitulo" style={{ margin: '-6px 0 12px' }}>Promedio general de las puntuaciones (escala 0 a 100) de todos los evaluados.</p>
           <GraficaLinea puntos={evolucion} />
         </div>
       </div>
@@ -85,6 +103,7 @@ export default function Dashboard() {
       <div className="grid-2">
         <div className="panel">
           <h2>Promedio de puntuación por área</h2>
+          <p className="subtitulo" style={{ margin: '-6px 0 12px' }}>Puntuación promedio (0 a 100) de los evaluados de cada área.</p>
           <table className="tabla">
             <thead><tr><th>Área</th><th>Evaluados</th><th>Promedio</th></tr></thead>
             <tbody>
@@ -97,6 +116,7 @@ export default function Dashboard() {
 
         <div className="panel">
           <h2>Top talento de alto potencial</h2>
+          <p className="subtitulo" style={{ margin: '-6px 0 12px' }}>Colaboradores de alto potencial ordenados por puntuación; haz clic en un nombre para ver su perfil.</p>
           <table className="tabla">
             <thead><tr><th>Colaborador</th><th>Área</th><th>Puntuación</th><th>Revisión</th></tr></thead>
             <tbody>
@@ -114,18 +134,24 @@ export default function Dashboard() {
                   </td>
                 </tr>
               ))}
-              {!top.length && <tr><td colSpan="4">Sin talento clasificado como alto potencial en el periodo.</td></tr>}
+              {!top.length && <tr><td colSpan="4">Aún no hay colaboradores clasificados como alto potencial en este periodo.</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
 
       {puede('reportes.exportar') && (
-        <div className="botones">
-          <button onClick={() => api.descargarCsv('/api/reportes/export/evaluaciones.csv', { periodo: datos.periodo })}>
-            ⬇ Exportar resultados (CSV)
-          </button>
-        </div>
+        <>
+          <div className="botones">
+            <button onClick={() => exportarResultados('csv')}>
+              ⬇ Exportar resultados (CSV)
+            </button>
+            <button className="secundario" onClick={() => exportarResultados('excel')}>
+              ⬇ Exportar resultados (Excel)
+            </button>
+          </div>
+          {errorExportacion && <div className="error" role="alert">{errorExportacion}</div>}
+        </>
       )}
     </div>
   )

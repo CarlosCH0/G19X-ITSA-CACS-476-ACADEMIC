@@ -12,7 +12,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
 
-  // Redirección declarativa: si ya hay sesión, no se muestra el formulario.
+  // Si ya hay una sesion activa, se muestra directamente el inicio.
   if (usuario) return <Navigate to="/" replace />
 
   const enviar = async (e) => {
@@ -39,7 +39,7 @@ export default function Login() {
         <h1>
           Talento HiPo<span className="punto-ambar">.</span>
         </h1>
-        <p>Sistema para identificar talento de alto potencial</p>
+        <p>Sistema de Identificación de Talento de Alto Potencial</p>
         {error && <div className="error">{error}</div>}
         <form onSubmit={enviar}>
           <div>
@@ -67,10 +67,6 @@ export default function Login() {
             {cargando ? 'Verificando…' : 'Iniciar sesión'}
           </button>
         </form>
-        <div className="login-nota">
-          Usuario de prueba: admin@develop.com.mx
-          (contraseña: Admin123!).
-        </div>
       </div>
     </div>
   )

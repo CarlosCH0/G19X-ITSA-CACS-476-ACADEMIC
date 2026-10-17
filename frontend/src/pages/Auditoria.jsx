@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client.js'
+import { formatearFechaHora } from '../utils/fecha.js'
 
 export default function Auditoria() {
   const [datos, setDatos] = useState(null)
@@ -37,7 +38,7 @@ export default function Auditoria() {
           <tbody>
             {datos?.items.map((a) => (
               <tr key={a.id}>
-                <td style={{ whiteSpace: 'nowrap' }}>{new Date(a.fecha_hora).toLocaleString('es-MX')}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{formatearFechaHora(a.fecha_hora)}</td>
                 <td>{a.usuario_nombre}</td>
                 <td><b>{a.accion}</b></td>
                 <td>{a.recurso}</td>

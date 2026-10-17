@@ -26,11 +26,15 @@ from app.schemas.colaborador import (
     MedicionValidezUpdate,
 )
 from app.schemas.evaluacion import (
+    AreaPruebasOut,
+    AreaPruebasUpdate,
     ConfiguracionCreate,
+    ConfiguracionAreasPruebasOut,
     ConfiguracionOut,
     EjecutarEvaluacionRequest,
     ResumenEjecucion,
     FactorOut,
+    IndicadorAreaOut,
     RevisionOut,
     ResultadoOut,
     EvaluacionListado,
@@ -41,7 +45,20 @@ from app.schemas.evaluacion import (
 )
 from app.schemas.reporte import (
     AuditoriaOut,
+    ConsultaAsistidaRequest,
+    ConsultaAsistidaResponse,
     PaginaAuditoria,
+)
+from app.schemas.plan import (
+    AccionIn,
+    AccionOut,
+    EstadisticasPlanes,
+    PaginaPlanes,
+    PlanCreate,
+    PlanDetalle,
+    PlanListado,
+    PlanOut,
+    PlanUpdate,
 )
 
 __all__ = [n for n in dir() if not n.startswith("_")]

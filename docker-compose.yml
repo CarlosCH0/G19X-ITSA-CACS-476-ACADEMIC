@@ -1,18 +1,17 @@
-# MVP — Sistema de Identificación de Talento de Alto Potencial
-# PluriOne S.A. de C.V. — Develop Talent & Technology
+# Sistema HiPo para identificar talento de alto potencial.
+# PluriOne S.A. de C.V. - Develop Talent & Technology.
 
 services:
   db:
     image: postgres:16-alpine
-    container_name: hipo_mvp_db
+    container_name: hipo_db
     environment:
       POSTGRES_DB: talento
       POSTGRES_USER: talento
-      POSTGRES_PASSWORD: talento
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}
     volumes:
-      - mvp_datos_postgres:/var/lib/postgresql/data
-    ports:
-      - "5433:5432"
+      - datos_postgres:/var/lib/postgresql/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U talento -d talento"]
       interval: 5s
@@ -21,27 +20,37 @@ services:
 
   backend:
     build: ./backend
-    container_name: hipo_mvp_backend
+    container_name: hipo_backend
     environment:
-      DATABASE_URL: postgresql+psycopg2://talento:talento@db:5432/talento
-      SECRET_KEY: ${SECRET_KEY:-cambiar-en-produccion}
+      DATABASE_URL: postgresql+psycopg2://talento:${POSTGRES_PASSWORD}@db:5432/talento
+      SECRET_KEY: ${SECRET_KEY:?Configura SECRET_KEY en .env}
       ENTORNO: produccion
-      SEED_DEMO_DATA: "true"
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@develop.com.mx}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123!}
+      SEED_DEMO_DATA: "false"
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Configura ADMIN_EMAIL en .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Configura ADMIN_PASSWORD en .env}
+      # Azure OpenAI (opcional; sin credenciales se usa el modo local)
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_KEY: ${AZURE_OPENAI_KEY:-}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-gpt-4o-mini}
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   frontend:
     build: ./frontend
-    container_name: hipo_mvp_frontend
+    container_name: hipo_frontend
+    restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
-      - "8082:80"
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8081}:80"
 
 volumes:
-  mvp_datos_postgres:
+  datos_postgres:

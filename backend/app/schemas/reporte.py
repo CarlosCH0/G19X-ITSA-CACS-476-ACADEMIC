@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AuditoriaOut(BaseModel):
@@ -23,3 +23,16 @@ class PaginaAuditoria(BaseModel):
     pagina: int
     tamanio: int
     items: list[AuditoriaOut]
+
+
+class ConsultaAsistidaRequest(BaseModel):
+    """Consulta asistida por IA usando solo contexto autorizado (RF-08)."""
+    pregunta: str = Field(min_length=5, max_length=1000)
+    colaborador_id: int | None = None
+    periodo: str | None = Field(default=None, max_length=20)
+
+
+class ConsultaAsistidaResponse(BaseModel):
+    respuesta: str
+    origen: str
+    advertencia: str | None = None

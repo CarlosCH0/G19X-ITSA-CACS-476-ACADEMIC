@@ -21,6 +21,10 @@ jobs:
           cache: pip
       - name: Instalar dependencias
         run: pip install -r requirements.txt
+      - name: Validar migración desde una base vacía
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: sqlite:///./ci_migrations.db
       - name: Ejecutar pruebas
         run: python -m pytest tests -q
         env:

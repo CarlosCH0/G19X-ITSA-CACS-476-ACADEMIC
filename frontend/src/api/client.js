@@ -1,4 +1,3 @@
-// Cliente HTTP con token JWT y manejo de errores común (RF-01).
 const BASE = import.meta.env.VITE_API_URL || ''
 
 async function request(path, { method = 'GET', body, params } = {}) {
@@ -9,16 +8,18 @@ async function request(path, { method = 'GET', body, params } = {}) {
     })
   }
   const token = localStorage.getItem('token')
-  const headers = { 'Content-Type': 'application/json' }
+  const esFormulario = typeof FormData !== 'undefined' && body instanceof FormData
+  const headers = esFormulario ? {} : { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
   const respuesta = await fetch(url.pathname + url.search, {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: body === undefined ? undefined : esFormulario ? body : JSON.stringify(body),
   })
 
   if (respuesta.status === 401) {
+    // Si la sesion vencio o el token no sirve, se limpia y se vuelve al inicio.
     localStorage.removeItem('token')
     localStorage.removeItem('usuario')
     if (!window.location.hash.includes('/login')) window.location.hash = '#/login'
@@ -37,24 +38,39 @@ async function request(path, { method = 'GET', body, params } = {}) {
   return datos
 }
 
+async function descargarArchivo(path, params, nombrePredeterminado) {
+  const url = new URL(BASE + path, window.location.origin)
+  if (params) Object.entries(params).forEach(([k, v]) => { if (v) url.searchParams.set(k, v) })
+  const headers = {}
+  const token = localStorage.getItem('token')
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const respuesta = await fetch(url.pathname + url.search, { headers })
+  if (!respuesta.ok) {
+    const tipoContenido = respuesta.headers.get('content-type') || ''
+    let mensaje = `Error ${respuesta.status}`
+    if (tipoContenido.includes('application/json')) {
+      const datos = await respuesta.json()
+      if (typeof datos?.detail === 'string') mensaje = datos.detail
+    }
+    throw new Error(mensaje)
+  }
+  const blob = await respuesta.blob()
+  const enlace = document.createElement('a')
+  enlace.href = window.URL.createObjectURL(blob)
+  enlace.download = (respuesta.headers.get('content-disposition') || '').split('"')[1] || nombrePredeterminado
+  document.body.appendChild(enlace)
+  enlace.click()
+  enlace.remove()
+  window.setTimeout(() => window.URL.revokeObjectURL(enlace.href), 1000)
+}
+
 export const api = {
   get: (path, params) => request(path, { params }),
   post: (path, body) => request(path, { method: 'POST', body }),
+  postArchivo: (path, body) => request(path, { method: 'POST', body }),
   put: (path, body) => request(path, { method: 'PUT', body }),
   patch: (path, body) => request(path, { method: 'PATCH', body }),
   delete: (path) => request(path, { method: 'DELETE' }),
-  descargarCsv: async (path, params) => {
-    const url = new URL(BASE + path, window.location.origin)
-    if (params) Object.entries(params).forEach(([k, v]) => { if (v) url.searchParams.set(k, v) })
-    const headers = {}
-    const token = localStorage.getItem('token')
-    if (token) headers['Authorization'] = `Bearer ${token}`
-    const r = await fetch(url.pathname + url.search, { headers })
-    if (!r.ok) throw new Error(`Error ${r.status}`)
-    const blob = await r.blob()
-    const enlace = document.createElement('a')
-    enlace.href = window.URL.createObjectURL(blob)
-    enlace.download = (r.headers.get('content-disposition') || '').split('"')[1] || 'reporte.csv'
-    enlace.click()
-  },
+  descargarCsv: (path, params) => descargarArchivo(path, params, 'reporte.csv'),
+  descargarExcel: (path, params) => descargarArchivo(path, params, 'reporte.xlsx'),
 }

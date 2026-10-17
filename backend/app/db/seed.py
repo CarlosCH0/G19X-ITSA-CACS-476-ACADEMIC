@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Datos iniciales y de demostración (solo primer arranque).
+"""Datos iniciales y de demostracion
 
-Crea: permisos, roles RBAC, usuario administrador, catálogo de indicadores y
-la versión 1 de la configuración de criterios. Si SEED_DEMO_DATA=true agrega
-usuarios de prueba, colaboradores y mediciones de dos periodos.
+Aquí se crean los permisos, los roles, el usuario admin, el catálogo de
+indicadores y la versión 1 de los criterios
 """
 import random
 from datetime import date
@@ -14,17 +13,21 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.security import hash_password
 from app.models import (
+    AccionPlan,
     Colaborador,
     ConfiguracionEvaluacion,
     Direccion,
+    EstadoPlan,
     Indicador,
     MedicionIndicador,
     Permiso,
+    PlanDesarrollo,
     Rol,
     TipoIndicador,
     Usuario,
     Validez,
 )
+from app.services.area_evaluacion_service import asegurar_areas
 
 PERMISOS: dict[str, str] = {
     "usuarios.gestionar": "Gestionar usuarios, roles y permisos",
@@ -37,6 +40,9 @@ PERMISOS: dict[str, str] = {
     "reportes.consultar": "Ver paneles y reportes",
     "reportes.exportar": "Exportar reportes",
     "auditoria.consultar": "Consultar el registro de auditoría",
+    "ia.usar": "Usar consultas y explicaciones asistidas por IA",
+    "planes.consultar": "Consultar planes de desarrollo y sucesión",
+    "planes.gestionar": "Administrar planes de desarrollo y sucesión",
 }
 
 ROLES: dict[str, list[str]] = {
@@ -44,11 +50,12 @@ ROLES: dict[str, list[str]] = {
     "GESTOR_TALENTO": [
         "colaboradores.gestionar", "colaboradores.consultar", "indicadores.gestionar",
         "evaluaciones.ejecutar", "evaluaciones.revisar", "configuracion.gestionar",
-        "reportes.consultar", "reportes.exportar",
+        "reportes.consultar", "reportes.exportar", "ia.usar",
+        "planes.consultar", "planes.gestionar",
     ],
     "EVALUADOR": [
         "colaboradores.consultar", "evaluaciones.ejecutar", "evaluaciones.revisar",
-        "reportes.consultar",
+        "reportes.consultar", "ia.usar", "planes.consultar",
     ],
     "CONSULTA": ["colaboradores.consultar", "reportes.consultar"],
 }
@@ -111,12 +118,90 @@ def _valor_demo(codigo: str, base: float, rng: random.Random) -> float:
 
 
 def _validez_demo(rng: random.Random) -> Validez:
+    # Casi todas las mediciones quedan validas; algunas quedan pendientes o
+    # invalidas para probar que el proceso las excluye.
     dado = rng.random()
     if dado < 0.92:
         return Validez.VALIDA
     if dado < 0.97:
         return Validez.PENDIENTE
     return Validez.INVALIDA
+
+
+def _planes_demo(colabs: list[Colaborador], admin_id: int) -> list[PlanDesarrollo]:
+    """Planes de desarrollo/sucesión de ejemplo (liderazgo y desarrollo)."""
+    por_codigo = {c.codigo: c for c in colabs}
+    plantillas: list[tuple[str, str, str, date, date, list[tuple[str, date | None, bool]]]] = [
+        (
+            "COL-001", "Ruta de sucesión a Tech Lead", "liderazgo",
+            date(2026, 1, 15), date(2026, 12, 15),
+            [
+                ("Programa de liderazgo de equipos ágiles", date(2026, 6, 30), False),
+                ("Mentoría a dos desarrolladoras junior", date(2026, 9, 30), True),
+                ("Liderar la migración del pipeline de datos", date(2026, 10, 31), True),
+            ],
+        ),
+        (
+            "COL-005", "Preparación para Dirección de Personas", "liderazgo",
+            date(2026, 3, 1), date(2026, 11, 30),
+            [
+                ("Certificación en People Analytics", date(2026, 8, 31), False),
+                ("Rotación como socio de negocio senior", date(2026, 7, 15), True),
+                ("Presentar propuesta de modelo de competencias", date(2026, 5, 31), True),
+            ],
+        ),
+        (
+            "COL-007", "Desarrollo como Contralora Corporativa", "especialista",
+            date(2025, 10, 1), date(2026, 8, 31),
+            [
+                ("Diplomado en finanzas corporativas", date(2026, 4, 30), True),
+                ("Automatizar el cierre contable mensual", date(2026, 2, 28), False),
+            ],
+        ),
+        (
+            "COL-009", "Plan de sucesión comercial", "liderazgo",
+            date(2026, 5, 1), date(2026, 12, 31),
+            [
+                ("Certificación en gestión de cuentas clave", date(2026, 9, 30), False),
+                ("Presentar plan anual de crecimiento a dirección", date(2026, 11, 15), False),
+            ],
+        ),
+        (
+            "COL-012", "Fortalecimiento de competencias base", "desarrollo",
+            date(2026, 6, 1), date(2026, 10, 31),
+            [
+                ("Curso de comunicación efectiva", date(2026, 8, 15), False),
+            ],
+        ),
+    ]
+    planes = []
+    for codigo, titulo, foco, inicio, fin, acciones in plantillas:
+        plan = PlanDesarrollo(
+            colaborador_id=por_codigo[codigo].id,
+            titulo=titulo,
+            objetivo=(
+                f"Preparar a {por_codigo[codigo].nombre} para mayores responsabilidades "
+                "mediante acciones de desarrollo trazables."
+            ),
+            foco=foco,
+            fecha_inicio=inicio,
+            fecha_fin=fin,
+            creado_por_id=admin_id,
+        )
+        completadas = 0
+        for descripcion, limite, completada in acciones:
+            plan.acciones.append(
+                AccionPlan(descripcion=descripcion, fecha_limite=limite, completada=completada)
+            )
+            completadas += 1 if completada else 0
+        total = len(acciones)
+        plan.progreso = round(completadas * 100.0 / total, 1)
+        if 0 < plan.progreso < 100:
+            plan.estado = EstadoPlan.EN_PROGRESO
+        elif plan.progreso >= 100:
+            plan.estado = EstadoPlan.COMPLETADO
+        planes.append(plan)
+    return planes
 
 
 def _asegurar_permisos_nuevos(db: Session) -> None:
@@ -138,6 +223,8 @@ def _asegurar_permisos_nuevos(db: Session) -> None:
     mapa = {p.codigo: p for p in faltantes}
     entrega: dict[str, list[str]] = {
         "ADMINISTRADOR": list(mapa.keys()),
+        "GESTOR_TALENTO": ["planes.consultar", "planes.gestionar"],
+        "EVALUADOR": ["planes.consultar"],
     }
     for nombre_rol, codigos in entrega.items():
         rol = db.scalars(select(Rol).where(Rol.nombre == nombre_rol)).first()
@@ -148,11 +235,31 @@ def _asegurar_permisos_nuevos(db: Session) -> None:
     db.commit()
 
 
+def _asegurar_planes_demo(db: Session) -> None:
+    """Siembra planes de ejemplo en bases ya sembradas sin ninguno."""
+    if not settings.seed_demo_data:
+        return
+    if db.scalars(select(PlanDesarrollo).limit(1)).first() is not None:
+        return
+    colabs = list(db.scalars(select(Colaborador).order_by(Colaborador.codigo)))
+    if not colabs:
+        return
+    admin = db.scalars(
+        select(Usuario).where(Usuario.correo == settings.admin_email)
+    ).first()
+    if admin is None:
+        return
+    db.add_all(_planes_demo(colabs, admin.id))
+    db.commit()
+
+
 def sembrar(db: Session) -> None:
-    """Idempotente: solo crea datos si la base está vacía."""
+    """Siembra solo si la base está vacía (se puede re-ejecutar sin miedo)."""
     if db.scalars(select(Rol).limit(1)).first() is not None:
-        # Base ya sembrada: aplica migraciones ligeras (permisos nuevos).
+        # Base ya sembrada: aplica migraciones ligeras (permisos y planes demo).
         _asegurar_permisos_nuevos(db)
+        _asegurar_planes_demo(db)
+        asegurar_areas(db)
         return
 
     # --- Permisos y roles ---
@@ -185,7 +292,7 @@ def sembrar(db: Session) -> None:
     }
     db.add_all(indicadores.values())
 
-    # --- Configuración v1 (activa) ---
+    # Configuracion v1 activa.
     cfg = ConfiguracionEvaluacion(
         version=1,
         nombre="Criterios HiPo v1 — cuadro de mando de talento",
@@ -197,7 +304,7 @@ def sembrar(db: Session) -> None:
     )
     db.add(cfg)
 
-    # --- Datos de demostración opcionales ---
+    # Datos de demostracion, si estan habilitados.
     if settings.seed_demo_data:
         rng = random.Random(2026)
         for nombre, correo, password, rol in USUARIOS_DEMO:
@@ -237,4 +344,8 @@ def sembrar(db: Session) -> None:
                             validez=validez,
                         )
                     )
+
+        # Planes de desarrollo/sucesion de demostracio
+        db.add_all(_planes_demo(colabs, admin.id))
     db.commit()
+    asegurar_areas(db)

@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.models import Clasificacion, EstadoEvaluacion, EstadoRevision
 
 
-# --------------------- Configuración de criterios ---------------------
+# Configuracion de criterios.
 class ConfiguracionCreate(BaseModel):
     """Nueva versión de criterios/ponderaciones/umbral (RF-16, RN-03)."""
     nombre: str = Field(min_length=3, max_length=120)
@@ -33,11 +33,36 @@ class ConfiguracionOut(BaseModel):
     fecha_creacion: datetime
 
 
-# --------------------- Ejecución y resultados ---------------------
+class IndicadorAreaOut(BaseModel):
+    id: int
+    codigo: str
+    nombre: str
+    tipo: str
+    activo: bool
+    en_criterios: bool
+
+
+class AreaPruebasOut(BaseModel):
+    area: str
+    indicador_ids: list[int]
+
+
+class ConfiguracionAreasPruebasOut(BaseModel):
+    areas: list[AreaPruebasOut]
+    indicadores: list[IndicadorAreaOut]
+
+
+class AreaPruebasUpdate(BaseModel):
+    area: str = Field(min_length=1, max_length=120)
+    indicador_ids: list[int]
+
+
+# Ejecucion y resultados.
 class EjecutarEvaluacionRequest(BaseModel):
     periodo: str = Field(min_length=4, max_length=20)
     colaborador_id: int | None = None
     configuracion_id: int | None = None
+    generar_explicacion_ia: bool = True
 
 
 class ResumenEjecucion(BaseModel):
