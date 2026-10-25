@@ -163,3 +163,31 @@ def test_validaciones_de_negocio_planes(client, tokens):
     # Detalle de plan inexistente → 404
     r3 = client.get("/api/planes/99999", headers=auth)
     assert r3.status_code == 404
+
+
+def test_plan_sin_acciones_inicia_sin_progreso(client, tokens):
+    auth = headers(tokens["gestor"])
+    colaboradores = client.get(
+        "/api/colaboradores?q=COL-002", headers=auth
+    ).json()["items"]
+    assert colaboradores
+
+    respuesta = client.post(
+        "/api/planes",
+        json={
+            "colaborador_id": colaboradores[0]["id"],
+            "titulo": "Plan sin acciones",
+            "fecha_inicio": "2026-09-01",
+            "fecha_fin": "2026-12-31",
+            "acciones": [],
+        },
+        headers=auth,
+    )
+    assert respuesta.status_code == 201, respuesta.text
+    plan = respuesta.json()
+    assert plan["total_acciones"] == 0
+    assert plan["progreso"] == 0.0
+    assert plan["estado"] == "planificado"
+
+    eliminacion = client.delete(f"/api/planes/{plan['id']}", headers=auth)
+    assert eliminacion.status_code == 204
