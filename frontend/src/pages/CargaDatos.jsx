@@ -4,6 +4,7 @@ import { api } from '../api/client.js'
 const EJEMPLO_CSV = `colaborador_codigo;indicador_codigo;periodo;valor;validez
 COL-001;DESEMPENO_GLOBAL;2026-S2;92.5;valida
 COL-001;LIDERAZGO;2026-S2;88.0;pendiente`
+const COLUMNAS_CSV = ['colaborador_codigo', 'indicador_codigo', 'periodo', 'valor', 'validez']
 
 export default function CargaDatos() {
   const [contenido, setContenido] = useState('')
@@ -46,6 +47,16 @@ export default function CargaDatos() {
       setError('Carga un archivo CSV o Excel, o pega el contenido de un CSV.')
       return
     }
+    if (!archivoExcel) {
+      const csv = contenido.replace(/^\uFEFF/, '')
+      const encabezado = csv.split(/\r?\n/).find((linea) => linea.trim())
+      const columnas = encabezado?.split(';').map((columna) => columna.trim().toLowerCase())
+      if (!columnas || columnas.length !== COLUMNAS_CSV.length
+        || columnas.some((columna, indice) => columna !== COLUMNAS_CSV[indice])) {
+        setError(`Encabezado CSV inválido. Usa estas columnas en este orden: ${COLUMNAS_CSV.join(';')}.`)
+        return
+      }
+    }
     setCargando(true)
     setError('')
     setAviso('')
@@ -58,7 +69,7 @@ export default function CargaDatos() {
         resultado = await api.postArchivo('/api/indicadores/carga-xlsx', formulario)
       } else {
         resultado = await api.post('/api/indicadores/carga-csv', {
-          contenido, validar_solo: validarSolo,
+          contenido: contenido.replace(/^\uFEFF/, ''), validar_solo: validarSolo,
         })
       }
       setReporte(resultado)
