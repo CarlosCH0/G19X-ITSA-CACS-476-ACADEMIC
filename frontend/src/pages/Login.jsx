@@ -40,12 +40,15 @@ export default function Login() {
           Talento HiPo<span className="punto-ambar">.</span>
         </h1>
         <p>Sistema de Identificación de Talento de Alto Potencial</p>
-        {error && <div className="error">{error}</div>}
+        {error && <div className="error" role="alert">{error}</div>}
         <form onSubmit={enviar}>
           <div>
-            <label>Correo electrónico</label>
+            <label htmlFor="login-correo">Correo electrónico</label>
             <input
+              id="login-correo"
               type="email"
+              name="correo"
+              autoComplete="email"
               value={correo}
               onChange={(e) => setCorreo(e.target.value)}
               placeholder="usuario@develop.com.mx"
@@ -54,9 +57,12 @@ export default function Login() {
             />
           </div>
           <div>
-            <label>Contraseña</label>
+            <label htmlFor="login-password">Contraseña</label>
             <input
+              id="login-password"
               type="password"
+              name="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
