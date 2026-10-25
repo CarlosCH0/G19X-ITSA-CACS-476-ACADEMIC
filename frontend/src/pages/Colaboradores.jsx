@@ -88,13 +88,18 @@ export default function Colaboradores() {
   const [area, setArea] = useState('')
   const [pagina, setPagina] = useState(1)
   const [error, setError] = useState('')
+  const [cargando, setCargando] = useState(true)
   const [editando, setEditando] = useState(null) // null | {} | colaborador
   const [areas, setAreas] = useState([])
   const [areasCargando, setAreasCargando] = useState(false)
 
   const cargar = () => {
+    setCargando(true)
+    setError('')
     api.get('/api/colaboradores', { q, area, pagina, tamanio: 12, incluir_inactivos: true })
-      .then(setDatos).catch((e) => setError(e.message))
+      .then(setDatos)
+      .catch((e) => setError(e.message))
+      .finally(() => setCargando(false))
   }
   useEffect(() => { cargar() }, [q, area, pagina])
 
@@ -157,7 +162,11 @@ export default function Colaboradores() {
             <tr><th>Código</th><th>Nombre</th><th>Área</th><th>Puesto</th><th>Última evaluación</th><th>Estado</th><th>Acciones</th></tr>
           </thead>
           <tbody>
-            {datos?.items.map((c) => (
+            {cargando ? (
+              <tr><td colSpan="7">Cargando colaboradores…</td></tr>
+            ) : !datos?.items.length ? (
+              <tr><td colSpan="7">No se encontraron colaboradores con esos filtros.</td></tr>
+            ) : datos.items.map((c) => (
               <tr key={c.id} style={{ opacity: c.estado ? 1 : 0.55 }}>
                 <td>{c.codigo}</td>
                 <td><Link to={`/colaboradores/${c.id}`}>{c.nombre}</Link></td>
@@ -193,7 +202,7 @@ export default function Colaboradores() {
         </table>
         <div className="paginacion">
           <button className="secundario" disabled={pagina <= 1} onClick={() => setPagina(pagina - 1)}>← Anterior</button>
-          Página {pagina} de {paginas} · {datos?.total} registros
+          Página {pagina} de {paginas} · {datos?.total ?? 0} registros
           <button className="secundario" disabled={pagina >= paginas} onClick={() => setPagina(pagina + 1)}>Siguiente →</button>
         </div>
       </div>
