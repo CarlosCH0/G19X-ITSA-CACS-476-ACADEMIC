@@ -37,6 +37,30 @@ analíticos, IA asistida (Azure OpenAI) y revisión humana obligatoria.
 | Auditoría | Registro persistente de quién, cuándo y sobre qué | RF-15, RNF-04, RN-08 |
 | IA asistida | Consultas y explicaciones con contexto autorizado | RF-07, RF-08 |
 
+## Capturas para la demostración
+
+Vistas del sistema con datos de demostración. Haz clic en una imagen para verla en
+tamaño completo.
+
+<table>
+  <tr>
+    <th>Panel de talento</th>
+    <th>Evaluaciones</th>
+  </tr>
+  <tr>
+    <td><a href="docs/capturas/panel.png"><img src="docs/capturas/panel.png" alt="Panel de talento con indicadores y distribución de colaboradores" width="560"></a></td>
+    <td><a href="docs/capturas/evaluaciones.png"><img src="docs/capturas/evaluaciones.png" alt="Listado de evaluaciones y clasificación de colaboradores" width="560"></a></td>
+  </tr>
+  <tr>
+    <th>Matriz de sucesión 9-box</th>
+    <th>Carga de mediciones CSV</th>
+  </tr>
+  <tr>
+    <td><a href="docs/capturas/matriz-9box.png"><img src="docs/capturas/matriz-9box.png" alt="Matriz de sucesión 9-box con colaboradores por cuadrante" width="560"></a></td>
+    <td><a href="docs/capturas/carga-csv.png"><img src="docs/capturas/carga-csv.png" alt="Carga masiva de mediciones con ejemplo CSV" width="560"></a></td>
+  </tr>
+</table>
+
 ## Documentación del proyecto
 
 La documentación complementaria está en la carpeta `docs/`:
