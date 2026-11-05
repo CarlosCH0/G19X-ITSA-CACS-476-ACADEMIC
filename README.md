@@ -278,6 +278,18 @@ python -m pytest tests -q
 Los archivos generados, bases de datos locales, entornos virtuales y logs quedan
 fuera del control de versiones mediante `.gitignore`.
 
+## Uso de IA
+
+El proyecto fue diseñado y desarrollado principalmente por mí, Carlos. Definí sus
+requerimientos, la organización de sus módulos y las decisiones de implementación;
+también integré y revisé el código, la documentación y las pruebas del sistema.
+
+Utilicé GitHub Copilot en VS Code como apoyo complementario para resolver dudas
+técnicas, identificar posibles errores y revisar algunos detalles de código y
+documentación. Las sugerencias de la IA no se incorporaron automáticamente: yo evalué
+cuáles eran pertinentes, realicé los ajustes necesarios y mantuve la responsabilidad
+por las decisiones técnicas y la validación final del proyecto.
+
 ## Cobertura de requerimientos
 
 - RF-01..RF-19 y RNF-01..RNF-14 implementados en el servidor y la interfaz web según los documentos
