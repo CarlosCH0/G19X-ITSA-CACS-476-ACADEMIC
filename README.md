@@ -78,6 +78,9 @@ proyecto/
 
 ## Puesta en marcha (desarrollo)
 
+Para iniciar el sistema en desarrollo, elige una de las opciones de base de datos
+siguientes. La opción SQLite no requiere Docker ni una instalación de PostgreSQL.
+
 ## Base de datos
 
 ### Opción A: SQLite local
@@ -88,7 +91,8 @@ tablas y los datos de demostración al iniciar.
 
 ```powershell
 cd backend
-venv\Scripts\pip install -r requirements.txt
+python -m venv venv
+venv\Scripts\python -m pip install -r requirements.txt
 venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
 ```
 
