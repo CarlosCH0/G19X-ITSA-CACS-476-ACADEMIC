@@ -163,18 +163,6 @@ http://localhost:8081. Como la aplicación usa rutas con hash, abre
 docker compose down
 ```
 
-### Servidor
-
-```powershell
-cd backend
-python -m venv venv
-venv\Scripts\pip install -r requirements.txt
-venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
-```
-
-- Documentación interactiva: http://localhost:8000/docs
-- Por defecto usa SQLite (`talento.db`) y siembra datos de demostración.
-
 ### Interfaz web
 
 ```powershell

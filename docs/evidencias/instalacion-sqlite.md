@@ -40,3 +40,19 @@ venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
   funcionen también en una carpeta sin entorno virtual.
 - Se añadió una explicación bajo «Puesta en marcha (desarrollo)», cuyo título estaba
   seguido directamente por otro encabezado sin texto introductorio.
+
+## Validación adicional (2026-11-09)
+
+**Commit de referencia:** `2d81d0217abda005d580b71896b0d70c96e1ea88` (HEAD al iniciar
+la validación; también se probaron los cambios locales existentes).
+
+**Entorno:** Windows PowerShell, Python 3.14.2, Node.js 24.21.0 y npm 11.19.0.
+
+| Comprobación | Resultado |
+|---|---|
+| SQLite limpia y `GET /api/health` | La API inició con una base temporal nueva y respondió HTTP 200 (`estado: ok`, `entorno: desarrollo`). |
+| `npm ci` | Correcto: instaló 66 paquetes. npm informó 5 vulnerabilidades en dependencias (3 moderadas y 2 altas). |
+| `npm run dev` e inicio de sesión | Vite inició en `http://127.0.0.1:5173/`; el acceso con `admin@develop.com.mx` fue correcto y cargó el panel de talento. |
+| `pytest tests -q` | Correcto: 45 pruebas aprobadas; 2 advertencias deprecadas. |
+| `npm test` | Correcto: 3 pruebas aprobadas, ninguna fallida. |
+| `npm run build` | Correcto: Vite generó el paquete de producción. |
