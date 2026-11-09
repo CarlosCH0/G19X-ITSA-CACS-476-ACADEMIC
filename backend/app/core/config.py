@@ -7,7 +7,9 @@ hardcodeados en el código.
 """
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 
 class Settings(BaseSettings):
@@ -43,6 +45,29 @@ class Settings(BaseSettings):
     azure_openai_deployment: str = "gpt-4o-mini"
     azure_openai_api_version: str = "2024-08-01-preview"
     ia_timeout_segundos: int = 20
+
+    @model_validator(mode="after")
+    def validar_produccion(self):
+        if self.entorno.casefold() in {"produccion", "production"}:
+            secret_key = self.secret_key.casefold()
+            if (
+                len(self.secret_key) < 32
+                or secret_key.startswith("cambiar")
+                or any(marca in secret_key for marca in ("reemplazar", "example"))
+                or len(set(self.secret_key)) < 8
+            ):
+                raise ValueError("SECRET_KEY debe tener al menos 32 caracteres aleatorios en producción.")
+            if self.seed_demo_data:
+                raise ValueError("SEED_DEMO_DATA debe ser false en producción.")
+            if len(self.admin_password) < 12 or "reemplazar" in self.admin_password.casefold():
+                raise ValueError("ADMIN_PASSWORD debe tener al menos 12 caracteres en producción.")
+            if self.admin_email.casefold().endswith(".example"):
+                raise ValueError("ADMIN_EMAIL debe ser una cuenta real del cliente en producción.")
+            if not self.database_url.startswith(("postgresql://", "postgresql+")):
+                raise ValueError("Producción requiere una base de datos PostgreSQL.")
+            if len(make_url(self.database_url).password or "") < 24:
+                raise ValueError("La contraseña PostgreSQL debe tener al menos 24 caracteres en producción.")
+        return self
 
     @property
     def cors_origins_list(self) -> list[str]:

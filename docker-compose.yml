@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: talento
       POSTGRES_USER: talento
-      POSTGRES_PASSWORD: talento
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}
     volumes:
       - datos_postgres:/var/lib/postgresql/data
     ports:
@@ -23,12 +23,12 @@ services:
     build: ./backend
     container_name: hipo_backend
     environment:
-      DATABASE_URL: postgresql+psycopg2://talento:talento@db:5432/talento
-      SECRET_KEY: ${SECRET_KEY:-cambiar-en-produccion}
+      DATABASE_URL: postgresql+psycopg2://talento:${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}@db:5432/talento
+      SECRET_KEY: ${SECRET_KEY:?Configura SECRET_KEY en .env}
       ENTORNO: produccion
-      SEED_DEMO_DATA: "true"
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@develop.com.mx}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123!}
+      SEED_DEMO_DATA: "false"
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Configura ADMIN_EMAIL en .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Configura ADMIN_PASSWORD en .env}
       # Azure OpenAI (opcional; sin credenciales se usa el modo local)
       AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
       AZURE_OPENAI_KEY: ${AZURE_OPENAI_KEY:-}
