@@ -56,3 +56,22 @@ la validación; también se probaron los cambios locales existentes).
 | `pytest tests -q` | Correcto: 45 pruebas aprobadas; 2 advertencias deprecadas. |
 | `npm test` | Correcto: 3 pruebas aprobadas, ninguna fallida. |
 | `npm run build` | Correcto: Vite generó el paquete de producción. |
+
+## Validación en clon limpio (2026-11-09)
+
+**Commit probado:** `3e81b542e74fb4368232cb0399fd56f8f90caec9` (rama `master`).
+
+**Entorno:** Windows PowerShell, Python 3.14.2, Node.js 24.21.0 y npm 11.19.0.
+
+Se clonó `master` en una carpeta temporal nueva. Al iniciar, no había `.env`,
+entorno virtual, base SQLite ni `node_modules`. Se siguieron las instrucciones
+SQLite e interfaz web del README.
+
+| Comprobación | Resultado |
+|---|---|
+| Backend y SQLite | Se creó un entorno virtual nuevo, se instalaron `requirements.txt` y Uvicorn inició. `/api/health` respondió HTTP 200 (`estado: ok`, `entorno: desarrollo`); SQLite se creó desde cero. |
+| `npm ci` y `npm run dev` | Instalación correcta (66 paquetes); Vite inició en `http://127.0.0.1:5174/`. npm informó 5 vulnerabilidades en dependencias (3 moderadas y 2 altas). |
+| Inicio de sesión demo | Correcto con `gestor@develop.com.mx`; la interfaz mostró el rol `GESTOR_TALENTO` y cargó el panel con 12 colaboradores. |
+| `pytest tests -q` | 45 passed; 2 advertencias deprecadas. |
+| `npm test` | 3 passed; ninguna fallida. |
+| `npm run build` | Correcto; Vite generó los assets de producción. |
