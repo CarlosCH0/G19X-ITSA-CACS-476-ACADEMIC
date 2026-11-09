@@ -376,7 +376,7 @@ Los criterios de aceptación de las historias US-01..US-09 cumplidos.
 
 | Criterio | Verificación | Estado |
 |---|---|---|
-| Suite automatizada en verde | 34 pruebas pytest (auth/RBAC, CRUD, evaluaciones, planes, reportes) | Cumplido |
+| Suite automatizada en verde | 45 pruebas pytest (auth/RBAC, CRUD, evaluaciones, planes, reportes) | Cumplido |
 | Verificación end-to-end de módulos | verificar_modulos_e2e.py: 11/11 módulos contra servidor real | Cumplido |
 | Compilación de la interfaz | npm run build sin errores (Vite) | Cumplido |
 | Despliegue contenerizado | docker compose config/build correcto (db+backend+frontend) | Cumplido |

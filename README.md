@@ -91,7 +91,7 @@ proyecto/
 │   │   ├── services/     # lógica de negocio (flujo HiPo, IA, reportes, planes…)
 │   │   ├── routers/      # endpoints HTTP por módulo
 │   │   └── main.py       # aplicación FastAPI
-│   ├── tests/            # pytest (35 pruebas)
+│   ├── tests/            # pytest (45 pruebas)
 │   └── requirements.txt
 ├── frontend/
 │   └── src/              # React (panel, colaboradores, evaluaciones, matriz 9-box,
@@ -258,6 +258,8 @@ en riesgo o vencidos y resultados sin explicación (RF-09). Se muestra en la **c
 de la barra superior (se actualiza cada 2 minutos).
 
 ## Pruebas
+
+La suite de backend contiene 45 pruebas pytest. Consulta la [guía de pruebas](docs/pruebas.md), que también documenta `npm test` para la interfaz.
 
 ```powershell
 cd backend

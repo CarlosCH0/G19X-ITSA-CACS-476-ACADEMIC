@@ -343,7 +343,7 @@ arranca (mientras `SEED_DEMO_DATA=true`):
 
 El MVP se revisa de tres formas:
 
-1. **16 pruebas automáticas con pytest** (`backend/tests/`): prueban el login y
+1. **45 pruebas automáticas con pytest** (`backend/tests/`): prueban el login y
    los roles, la administración de datos, el cálculo de evaluaciones y los
    reportes. Por ejemplo: hay una prueba que verifica que si vuelves a ejecutar
    una evaluación **el histórico no se borra**, y otra que comprueba que
