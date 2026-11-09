@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     # PostgreSQL se usa en Docker y SQLite para desarrollo local.
     database_url: str = "sqlite:///./talento.db"
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # --- Seguridad ---
     secret_key: str = "cambiar-esta-clave-en-produccion-mediante-variable-de-entorno"
@@ -71,9 +72,7 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> list[str]:
-        # En desarrollo se usa Vite; en produccion, Nginx funciona como proxy.
-        raw = "http://localhost:5173,http://127.0.0.1:5173"
-        return [o.strip() for o in raw.split(",") if o.strip()]
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
     def ia_configurada(self) -> bool:

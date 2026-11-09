@@ -12,10 +12,10 @@
 --      automatica no vuelve a ejecutarse.
 --
 -- Usuarios de prueba (el hash PBKDF2 queda en la tabla usuario):
---   admin@develop.com.mx     / Admin123!     (ADMINISTRADOR)
---   gestor@develop.com.mx    / Gestor123!    (GESTOR_TALENTO)
---   evaluador@develop.com.mx / Evaluador123! (EVALUADOR)
---   consulta@develop.com.mx  / Consulta123!  (CONSULTA)
+--   admin@develop.com.mx     / <contraseña>     (ADMINISTRADOR)
+--   gestor@develop.com.mx    / <contraseña>    (GESTOR_TALENTO)
+--   evaluador@develop.com.mx / <contraseña> (EVALUADOR)
+--   consulta@develop.com.mx  / <contraseña>  (CONSULTA)
 --
 -- Generado desde la semilla determinista del sistema (app/db/seed.py,
 -- random.Random(2026)) mas una ejecucion del pipeline del periodo 2026-S1.

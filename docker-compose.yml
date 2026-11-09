@@ -25,6 +25,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://talento:${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}@db:5432/talento
       SECRET_KEY: ${SECRET_KEY:?Configura SECRET_KEY en .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       ENTORNO: produccion
       SEED_DEMO_DATA: "false"
       ADMIN_EMAIL: ${ADMIN_EMAIL:?Configura ADMIN_EMAIL en .env}
