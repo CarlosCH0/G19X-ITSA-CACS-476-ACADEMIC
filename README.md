@@ -130,7 +130,9 @@ Primero abre Docker Desktop y espera a que indique que el motor está funcionand
 Después, desde la raíz del proyecto, ejecuta:
 
 ```powershell
-docker compose up -d db backend
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+# Completa SECRET_KEY, POSTGRES_PASSWORD, ADMIN_EMAIL y ADMIN_PASSWORD en .env.
+docker compose up --build -d
 docker compose ps
 ```
 
