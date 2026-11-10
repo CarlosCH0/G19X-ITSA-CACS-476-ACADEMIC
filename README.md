@@ -9,6 +9,8 @@ Sistema que identifica colaboradores con alto potencial mediante el análisis de
 competencias, capacitación, experiencia, objetivos y métricas organizacionales, con modelos
 analíticos, IA asistida (Azure OpenAI) y revisión humana obligatoria.
 
+La versión de entrega está en la rama `master`.
+
 ## Arquitectura
 
 - **Servidor**: Python + FastAPI (capas: rutas → servicios → modelos ORM con SQLAlchemy 2.x).
