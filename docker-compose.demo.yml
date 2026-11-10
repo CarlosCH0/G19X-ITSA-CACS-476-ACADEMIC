@@ -1,0 +1,5 @@
+services:
+  backend:
+    environment:
+      ENTORNO: desarrollo
+      SEED_DEMO_DATA: "true"

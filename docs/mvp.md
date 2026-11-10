@@ -1,6 +1,3 @@
-> Nota de contexto: este documento explica el MVP (versión temprana) y qué quedó fuera de él.
-> El repositorio actual ya implementa el producto completo; véase README.md y
-> docs/como-funciona.md para el estado final de cada módulo.
 
 # Explicación del MVP — Sistema de Identificación de Alto Potencial
 
@@ -385,7 +382,6 @@ CSV, matriz 9-box, comparador de periodos, planes de desarrollo y alertas.
 > siempre lo tiene que **revisar y confirmar**, todo queda **registrado** en la
 > auditoría, y nada se borra: el histórico se conserva. Con eso se comprueba que
 > la idea del producto funciona antes de construir la versión grande.
-
 
 
 

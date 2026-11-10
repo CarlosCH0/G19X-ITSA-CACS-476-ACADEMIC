@@ -63,7 +63,7 @@ proyecto/
 │   │   ├── schemas/            # Contratos Pydantic (entrada/salida)
 │   │   ├── services/           # 10 servicios de negocio
 │   │   └── routers/            # 11 routers HTTP
-│   ├── tests/                  # 35 pruebas pytest (conftest + 6 módulos)
+│   ├── tests/                  # pruebas pytest (incluye seguridad de configuración)
 │   ├── smoke_e2e.py            # Smoke test manual contra servidor vivo
 │   ├── verificar_modulos_e2e.py# Verificación E2E exhaustiva de módulos
 │   └── verificar_vivo.py       # Verificación del stack desplegado (8081)
@@ -85,13 +85,15 @@ proyecto/
 ```python
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(bind=engine)   # crea el esquema si no existe
+    if settings.entorno.casefold() not in {"produccion", "production"}:
+        Base.metadata.create_all(bind=engine)  # solo desarrollo
     with SessionLocal() as db:
-        sembrar(db)                          # datos iniciales idempotentes
+        sembrar(db)
     yield
 ```
 
-- **`lifespan`**: al arrancar crea las tablas y siembra permisos, roles, admin,
+- **`lifespan`**: en desarrollo crea tablas faltantes; en Docker, Alembic aplica
+  migraciones antes de iniciar el servidor. Luego siembra permisos, roles, admin,
   indicadores, la configuración v1 de criterios y (si `SEED_DEMO_DATA=true`)
   usuarios, 12 colaboradores y mediciones de dos periodos.
 - **CORS**: permite los orígenes del dev server de Vite (`5173`).
@@ -121,7 +123,7 @@ Clase `Settings` (pydantic-settings) que lee variables de entorno o `.env`:
 
 `sembrar(db)` se ejecuta en cada arranque:
 
-1. **Si la base ya existe** (hay roles): aplica *migraciones ligeras*:
+1. **Si la base ya existe** (hay roles): aplica ajustes idempotentes de datos:
    `_asegurar_permisos_nuevos` (agrega permisos nuevos como `planes.*` a los
    roles que corresponden) y `_asegurar_planes_demo` (siembra planes de ejemplo
    si no hay ninguno). Nunca duplica datos.
@@ -383,18 +385,26 @@ Mediciones válidas 2026-S1:        LIDERAZGO  DESEMPENO_GLOBAL
 
 ### `docker-compose.yml` (3 servicios)
 - **db**: PostgreSQL 16 con volumen persistente y healthcheck (`pg_isready`).
-- **backend**: construye `backend/Dockerfile` (python:3.12-slim + uvicorn),
-  conecta a `db` con `DATABASE_URL` de PostgreSQL, espera a que db esté
-  *healthy*, variables de Azure OpenAI opcionales y publica `8000`.
-- **frontend**: build multi-stage (node:20 compila con Vite → nginx:alpine
+- **backend**: construye `backend/Dockerfile` (python:3.12-slim), aplica
+  `alembic upgrade head`, espera a que db esté *healthy* y no publica el puerto
+  al host. Requiere secretos y ejecuta sin datos demo.
+- **frontend**: build multi-stage (Node.js 20.19+ compila con Vite → nginx:alpine
   sirve `dist/`). `nginx.conf` sirve la SPA (`try_files … /index.html` por el
-  HashRouter) y hace **proxy** de `/api/` → `backend:8000`. Publica `8081→80`.
+  HashRouter) y hace **proxy** de `/api/` → `backend:8000`. Publica en
+  `127.0.0.1:8081` por defecto.
 
-Arranque completo: `docker compose up --build` → app en `http://localhost:8081`,
-API en `http://localhost:8000/docs`.
+Arranque: sustituye secretos en `.env.example`, cópialo a `.env` y ejecuta
+`docker compose up --build -d`. La interfaz queda en `http://127.0.0.1:8081`;
+para acceso remoto se requiere un proxy inverso con TLS.
+
+Para una demostración local en una base PostgreSQL nueva, desde el primer arranque
+combina `docker-compose.yml` con `docker-compose.demo.yml`; este activa la semilla
+de demostración y el entorno de desarrollo, sin cambiar el enlace local de la
+interfaz. No uses ese override en producción.
 
 ### CI (`.github/workflows/ci.yml`)
-- Job **backend**: instala requirements y corre `pytest` con SQLite temporal.
+- Job **backend**: instala requirements, valida la migración desde una base SQLite
+  limpia y corre `pytest`.
 - Job **frontend**: `npm ci` + `npm run build`.
 
 ## 12. Cómo ejecutar y verificar
@@ -413,8 +423,8 @@ npm run dev      # http://localhost:5173 (proxy /api → 8000)
 
 # --- Pruebas y verificaciones ---
 cd backend
-venv\Scripts\python -m pytest tests -q                 # 35 pruebas
-venv\Scripts\python verificar_modulos_e2e.py           # 11 módulos en vivo
+venv\Scripts\python -m pytest tests -q
+venv\Scripts\python verificar_modulos_e2e.py           # 11 modulos en vivo
 venv\Scripts\python verificar_vivo.py                # stack Docker (8081)
 venv\Scripts\python smoke_e2e.py                       # (servidor en 8001)
 
@@ -422,8 +432,10 @@ venv\Scripts\python smoke_e2e.py                       # (servidor en 8001)
 docker compose up --build
 ```
 
-Usuarios demo: `admin@` / `gestor@` / `evaluador@` / `consulta@develop.com.mx`
-(contraseñas `Admin123!`, `Gestor123!`, `Evaluador123!`, `Consulta123!`).
+En Compose normal, reemplaza primero los valores de `.env.example`; el despliegue usa
+PostgreSQL, no publica directamente la API y no crea usuarios ni datos demo. Las
+cuentas demo (`Admin123!`, `Gestor123!`, `Evaluador123!`, `Consulta123!`) son
+exclusivas del entorno local de desarrollo y del override de demostración.
 
 ## 13. Reglas de negocio y dónde se implementan
 
@@ -445,8 +457,8 @@ Usuarios demo: `admin@` / `gestor@` / `evaluador@` / `consulta@develop.com.mx`
   OpenAI (explicaciones deterministas locales con origen marcado).
 - **IA con contexto mínimo**: la IA nunca recibe datos crudos; solo resúmenes
   autorizados construidos por el servidor (privacidad por diseño).
-- **Idempotencia del seed** + migraciones ligeras: actualizar la app no
-  rompe bases existentes.
+- **Alembic en producción** y seed idempotente: los cambios del esquema se
+  versionan; los ajustes de datos iniciales no duplican registros.
 - **Baja lógica de colaboradores**: se conserva todo el histórico.
 - **`MODELO_VERSION`**: la puntuación está aislada en `evaluacion_service`
   y versionada → lista para sustituirse por Azure ML sin tocar el resto.

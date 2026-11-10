@@ -75,3 +75,16 @@ SQLite e interfaz web del README.
 | `pytest tests -q` | 45 passed; 2 advertencias deprecadas. |
 | `npm test` | 3 passed; ninguna fallida. |
 | `npm run build` | Correcto; Vite generó los assets de producción. |
+
+## Revisión actual de dependencias y Docker (2026-11-09)
+
+**Base:** commit `1ee7f54` más cambios locales sin publicar.
+**Entorno:** Windows PowerShell, Python 3.14.2, Node.js 24.21.0, npm 11.19.0 y Docker 29.9.3.
+
+| Comprobación | Resultado |
+|---|---|
+| `npm audit` | 0 vulnerabilidades tras actualizar Vite a 7.3.8, React Router a 7.18.5 y dependencias transitivas. |
+| `npm test` y `npm run build` | 3 pruebas aprobadas; compilación Vite exitosa. |
+| `pytest tests -q` | 45 pruebas aprobadas; 2 advertencias deprecadas. |
+| Compose normal | PostgreSQL y API sin puertos publicados; interfaz enlazada solo a `127.0.0.1`; semilla demo desactivada. |
+| Compose de demostración | Arranque saludable, inicio de sesión con `gestor@develop.com.mx` y 12 colaboradores; recursos temporales eliminados al terminar. |

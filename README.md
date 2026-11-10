@@ -76,6 +76,8 @@ La documentación complementaria está en la carpeta `docs/`:
 - `docs/arquitectura.md`: responsabilidades de cada capa y flujo principal.
 - `docs/manual-usuario.md`: manual de uso del sistema para el público general.
 - `docs/guia-desarrollo.md`: instalación, validaciones y convenciones de trabajo.
+- `docs/publicacion-github.md`: archivos incluidos/excluidos y lista de control
+  antes de publicar el repositorio.
 
 La raíz contiene únicamente los archivos de entrada del proyecto: configuración de
 Docker, variables de entorno de ejemplo, documentación general y automatización CI.
@@ -101,6 +103,13 @@ proyecto/
 ├── docker-compose.yml    # PostgreSQL + servidor + interfaz web
 └── .github/workflows/ci.yml
 ```
+
+Los archivos `db/base-de-datos.sql`, `carga_masiva_prueba.csv` y
+`carga_masiva_prueba.xlsx` contienen exclusivamente datos sintéticos para
+demostración. Las cuentas documentadas son públicas y no deben reutilizarse.
+Consulta [la lista de preparación para GitHub](docs/publicacion-github.md) antes
+de publicar o compartir una copia del repositorio. El repositorio se publicará sin
+licencia de reutilización; los derechos permanecen reservados.
 
 ## Puesta en marcha (desarrollo)
 
@@ -131,22 +140,34 @@ Después, desde la raíz del proyecto, ejecuta:
 
 ```powershell
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-# Completa SECRET_KEY, POSTGRES_PASSWORD, ADMIN_EMAIL y ADMIN_PASSWORD en .env.
+# Edita .env y reemplaza todos los valores de ejemplo por secretos únicos.
 docker compose up --build -d
 docker compose ps
 ```
 
-El servicio `db` usa PostgreSQL en el puerto `5432` y el backend se conecta mediante
-la variable `DATABASE_URL` definida en `docker-compose.yml`. Las tablas se crean al
-arrancar el backend. Para levantar también la interfaz web:
+El servicio `db` usa PostgreSQL en una red interna y el backend no publica su puerto
+al host. En producción, las tablas se actualizan con Alembic antes de iniciar la API;
+en desarrollo local el arranque crea las tablas faltantes. La interfaz se publica
+localmente en `http://127.0.0.1:8081`; el backend y PostgreSQL no publican puertos al
+host. Para acceso desde una red, sigue la sección de despliegue y coloca un proxy
+inverso con TLS delante de la interfaz.
+
+Para una demostración local con PostgreSQL, usa una base nueva y el Compose de demo
+desde el primer arranque:
 
 ```powershell
-docker compose up -d frontend
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up --build -d
 ```
 
-El script PostgreSQL con el esquema completo, sin datos, está en
-`backend/schema.sql`. Para crear la estructura manualmente, ejecútalo conectado a
-una base de datos vacía con `psql -U talento -d nombre_base -f backend/schema.sql`.
+Esta modalidad crea los usuarios y datos sintéticos de demostración, y mantiene la
+interfaz enlazada a `127.0.0.1`; úsala solo para evaluación local, nunca en producción.
+El Compose normal conserva la siembra desactivada y crea únicamente el administrador
+configurado en `.env`.
+
+`backend/schema.sql` y `db/base-de-datos.sql` se conservan como referencias y para
+instalaciones manuales de demostración. El despliegue Docker nuevo administra el
+esquema con Alembic; no importes esos SQL en esa base, porque el historial de
+migraciones también debe quedar registrado.
 
 Si quieres una base **lista para demostrar** (estructura y datos de prueba:
 usuarios, roles, 12 colaboradores, 257 mediciones, planes y la evaluación del
@@ -156,12 +177,10 @@ periodo 2026-S1 ya ejecutada), usa `db/base-de-datos.sql`:
 psql -U talento -d nombre_base -f db/base-de-datos.sql
 ```
 
-Al arrancar después el backend, la semilla automática detecta que la base ya
-tiene datos y no vuelve a sembrar.
-
-La API queda disponible en http://localhost:8000/api/health y la interfaz en
-http://localhost:8081. Como la aplicación usa rutas con hash, abre
-`http://localhost:8081/#/` y no `/dashboard/`. Para detener los servicios sin borrar los datos:
+La API interna puede comprobarse por el proxy en
+`http://127.0.0.1:8081/api/health`. Como la aplicación usa rutas con hash, abre
+`http://127.0.0.1:8081/#/` y no `/dashboard/`. Para detener los servicios sin borrar
+los datos:
 
 ```powershell
 docker compose down
@@ -178,17 +197,69 @@ npm run dev      # abre el navegador; usa la URL que imprime Vite (proxy /api ->
 En VS Code también puedes iniciar la aplicación completa con **Run and Debug → Backend FastAPI** (F5):
 se inicia Vite, se abre el login en el navegador y después arranca el backend.
 
-### Producción (Docker Compose)
+### Despliegue con Docker Compose
 
 ```powershell
-docker compose up --build
-# Interfaz web: http://localhost:8081 · API: http://localhost:8000/docs · PostgreSQL: 5432
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+# Edita .env y reemplaza todos los valores de ejemplo por secretos únicos.
+docker compose up --build -d
+# Interfaz local: http://127.0.0.1:8081
 ```
 
-Configura los secretos copiando `.env.example` a `.env` (SECRET_KEY, credenciales
-Azure OpenAI, contraseña del admin) — nunca versiones el `.env`.
+El acceso publicado queda limitado a `127.0.0.1`; la API y PostgreSQL solo son
+accesibles dentro de la red privada de Compose. Para acceso remoto, coloca un proxy
+inverso con TLS delante de la interfaz y configura firewall, dominio y certificados.
+La documentación OpenAPI se desactiva en producción. **No expongas directamente
+puertos HTTP sin TLS**. El `.env` nunca se versiona. `SEED_DEMO_DATA` está desactivado
+en el despliegue y el primer arranque solo crea el administrador indicado por
+`ADMIN_EMAIL` y `ADMIN_PASSWORD`.
 
-## Usuarios de demostración
+### Actualizar una instalación existente y respaldos
+
+Antes de desplegar esta versión sobre una base previa, realiza y prueba un respaldo.
+El despliegue anterior guardaba `talento` como contraseña de PostgreSQL. No reutilices
+esa contraseña con datos reales: reemplázala en `.env` por el nuevo secreto
+hexadecimal (mínimo 24 caracteres), actualiza el rol en el servidor actual y construye
+la imagen backend nueva:
+
+```powershell
+$pgPassword = (Get-Content .env | Where-Object { $_ -match '^POSTGRES_PASSWORD=' } | Select-Object -First 1).Split('=', 2)[1]
+docker compose exec -T db psql -U talento -d postgres -c "ALTER ROLE talento WITH PASSWORD '$pgPassword';"
+Remove-Variable pgPassword
+docker compose build backend
+```
+
+Si esa base no tiene `alembic_version`, verifica primero que su esquema corresponda
+exactamente al esquema inicial de esta versión. Solo después de respaldar y verificar
+la base existente puedes registrar la revisión inicial:
+
+```powershell
+docker compose run --no-deps --rm backend alembic stamp head
+docker compose up --build -d
+```
+
+Si el esquema no coincide, detén la actualización y prepara una migración específica;
+`stamp` solo registra una versión y **no** modifica ni valida las tablas existentes.
+Desactivar la semilla demo no elimina usuarios ni colaboradores ya guardados: limpia o
+anonimiza cualquier dato de demostración antes de entregar la base al cliente.
+
+Para generar una copia de seguridad PostgreSQL en Windows sin redirigir datos binarios
+por PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force .\backups | Out-Null
+docker compose exec -T db sh -c "pg_dump -U talento -d talento -Fc --no-owner --no-acl > /tmp/talento.dump"
+docker compose cp db:/tmp/talento.dump .\backups\talento.dump
+```
+
+Guarda los respaldos cifrados y fuera del repositorio; contienen datos personales.
+Prueba la restauración periódicamente en una base vacía antes de depender del respaldo.
+
+## Usuarios de demostración (solo desarrollo local)
+
+Estas cuentas se crean únicamente con `SEED_DEMO_DATA=true` en desarrollo. Para
+Docker, activa esa opción solo mediante `docker-compose.demo.yml` en una instalación
+local nueva; el Compose normal de producción las mantiene desactivadas.
 
 | Correo | Contraseña | Rol |
 |---|---|---|
@@ -196,6 +267,8 @@ Azure OpenAI, contraseña del admin) — nunca versiones el `.env`.
 | gestor@develop.com.mx | Gestor123! | GESTOR_TALENTO |
 | evaluador@develop.com.mx | Evaluador123! | EVALUADOR |
 | consulta@develop.com.mx | Consulta123! | CONSULTA |
+
+No reutilices estas credenciales en una instalación del cliente.
 
 ## Flujo de evaluación (RN del documento de arquitectura)
 
@@ -263,7 +336,9 @@ de la barra superior (se actualiza cada 2 minutos).
 
 ## Pruebas
 
-La suite de backend contiene 45 pruebas pytest. Consulta la [guía de pruebas](docs/pruebas.md), que también documenta `npm test` para la interfaz.
+La suite de backend contiene 45 pruebas pytest. Para las instrucciones completas,
+consulta la [guía de pruebas](docs/pruebas.md), que también documenta `npm test`
+para la interfaz.
 
 ```powershell
 cd backend
@@ -296,6 +371,9 @@ npm run build
 cd ..\backend
 python -m pytest tests -q
 ```
+
+`alembic upgrade head` se ejecuta automáticamente en el contenedor backend antes del
+servidor, y en CI se comprueba sobre una base limpia.
 
 Los archivos generados, bases de datos locales, entornos virtuales y logs quedan
 fuera del control de versiones mediante `.gitignore`.

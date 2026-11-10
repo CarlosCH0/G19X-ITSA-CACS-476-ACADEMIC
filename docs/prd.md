@@ -340,7 +340,7 @@ Azure OpenAI Service (opcional): explicaciones y consultas asistidas; sin creden
 
 PostgreSQL 16 en la implementación (SQLite en desarrollo local).
 
-Node.js 20 y Python 3.12 para construir; Docker para operar.
+Node.js 20.19 o posterior (o 22.12 o posterior) y Python 3.12 para construir; Docker para operar.
 
 Azure Machine Learning (futuro): sustituir/complementar la puntuación por reglas; la arquitectura ya la contempla (modelo versionado y aislado).
 
@@ -428,7 +428,3 @@ Estado de cada requerimiento funcional en el producto liberado (v1.1):
 | RF-17 | histórico por periodo sin sobrescribir | Implementado |
 | RF-18 | revisiones: confirmar/marcar pendiente | Implementado |
 | RF-19 | observaciones en evaluación y colaborador | Implementado |
-
-Nota: RF-07 se entrega como puntuación determinista por reglas versionada (MODELO_VERSION) con la lógica aislada en evaluacion_service, lista para sustituirse o complementarse con un endpoint de Azure Machine Learning sin afectar el resto del producto (ver roadmap v2.0).
-
-Fin del documento PRD — Sistema de Identificación de Talento de Alto Potencial · PluriOne S.A. de C.V.

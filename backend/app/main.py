@@ -29,8 +29,9 @@ from app.routers import (
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """Arranque: crea las tablas que falten y siembra datos (solo si la BD está vacía)."""
-    Base.metadata.create_all(bind=engine)
+    """Arranque: desarrollo crea tablas; producción aplica migraciones antes del servidor."""
+    if settings.entorno.casefold() not in {"produccion", "production"}:
+        Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         sembrar(db)
     yield
@@ -38,13 +39,16 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="1.0.0",
+    version="1.1.0",
     description=(
         "API para la identificación de colaboradores con alto potencial mediante "
         "análisis de desempeño, competencias, capacitación, experiencia, objetivos "
         "y métricas organizacionales. Incluye RBAC, trazabilidad, revisión humana "
         "e integración opcional con Azure OpenAI."
     ),
+    docs_url=None if settings.entorno.casefold() in {"produccion", "production"} else "/docs",
+    redoc_url=None if settings.entorno.casefold() in {"produccion", "production"} else "/redoc",
+    openapi_url=None if settings.entorno.casefold() in {"produccion", "production"} else "/openapi.json",
     lifespan=lifespan,
 )
 

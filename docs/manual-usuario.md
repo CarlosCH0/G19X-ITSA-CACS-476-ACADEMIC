@@ -8,10 +8,6 @@ MANUAL DE USUARIO
 
 Sistema de Identificación de Talento de Alto Potencial (Talento HiPo) — v1.1
 
-Alumno: Carlos Antonio Chapulín Segundo
-
-Fecha: 06/11/2026
-
 ### 1. ¿Para qué sirve este sistema?
 
 Talento HiPo es una página web que ayuda a la empresa a descubrir a las personas con mayor potencial. El sistema reúne la información de cada persona —su desempeño, sus competencias, sus cursos, su experiencia y el cumplimiento de sus objetivos— y le da una puntuación del 0 al 100.
@@ -35,7 +31,8 @@ La dirección del sistema, entregada por la empresa: http://localhost:8081/#/ (i
 
 Su usuario (correo) y su contraseña.
 
-Si aún no tiene usuario, pídalo al administrador del sistema. Para pruebas, el sistema trae estas cuentas de demostración:
+Si aún no tiene usuario, pídalo al administrador del sistema. Las siguientes cuentas
+solo existen en la instalación local de demostración y no funcionan en producción:
 
 | Correo | Contraseña | Tipo de usuario |
 |---|---|---|

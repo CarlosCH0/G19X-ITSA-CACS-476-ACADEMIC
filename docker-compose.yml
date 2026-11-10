@@ -4,15 +4,13 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: hipo_db
     environment:
       POSTGRES_DB: talento
       POSTGRES_USER: talento
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}
     volumes:
       - datos_postgres:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U talento -d talento"]
       interval: 5s
@@ -21,7 +19,6 @@ services:
 
   backend:
     build: ./backend
-    container_name: hipo_backend
     environment:
       DATABASE_URL: postgresql+psycopg2://talento:${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD en .env}@db:5432/talento
       SECRET_KEY: ${SECRET_KEY:?Configura SECRET_KEY en .env}
@@ -34,19 +31,24 @@ services:
       AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
       AZURE_OPENAI_KEY: ${AZURE_OPENAI_KEY:-}
       AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-gpt-4o-mini}
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   frontend:
     build: ./frontend
-    container_name: hipo_frontend
+    restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
-      - "8081:80"
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8081}:80"
 
 volumes:
   datos_postgres:

@@ -6,16 +6,16 @@
 --   1) Crea una base vacia:            createdb talento
 --   2) Carga este script:              psql -U talento -d talento -f db/base-de-datos.sql
 --   3) Configura .env con:
---        DATABASE_URL=postgresql+psycopg2://talento:<contraseña>@localhost:5432/talento
+--        DATABASE_URL=postgresql+psycopg2://talento:talento@localhost:5432/talento
 --        SEED_DEMO_DATA=false
 --   4) Arranca el backend. La base ya tiene datos, por lo que la semilla
 --      automatica no vuelve a ejecutarse.
 --
 -- Usuarios de prueba (el hash PBKDF2 queda en la tabla usuario):
---   admin@develop.com.mx     / <contraseña>     (ADMINISTRADOR)
---   gestor@develop.com.mx    / <contraseña>    (GESTOR_TALENTO)
+--   admin@develop.com.mx     / <contraseña> (ADMINISTRADOR)
+--   gestor@develop.com.mx    / <contraseña> (GESTOR_TALENTO)
 --   evaluador@develop.com.mx / <contraseña> (EVALUADOR)
---   consulta@develop.com.mx  / <contraseña>  (CONSULTA)
+--   consulta@develop.com.mx  / <contraseña> (CONSULTA)
 --
 -- Generado desde la semilla determinista del sistema (app/db/seed.py,
 -- random.Random(2026)) mas una ejecucion del pipeline del periodo 2026-S1.
